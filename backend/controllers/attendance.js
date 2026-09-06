@@ -1,6 +1,6 @@
 const REGISTERED_STUDENTS = [
   { id: "24-10326", name: "Marcky Paulo Balaba" },
-  { id: "2023-10043", name: "JUAN BALABA" },
+  { id: "24-10383", name: "Lanther han Serrano" },
   { id: "2023-10044", name: "JANE SMITH" },
   { id: "2023-10045", name: "MARIA SANTOS" }
 ];

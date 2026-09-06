@@ -1,0 +1,94 @@
+-- 1. Central Authentication Table
+CREATE TABLE users (
+    user_id VARCHAR(36) PRIMARY KEY,
+    email VARCHAR(120) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role ENUM('ADMIN', 'TEACHER', 'STUDENT') NOT NULL,
+    requires_password_change BOOLEAN DEFAULT TRUE
+);
+
+-- 2. Physical Lab Rooms
+CREATE TABLE lab_rooms (
+    lab_id INT AUTO_INCREMENT PRIMARY KEY,
+    room_name VARCHAR(50) NOT NULL,
+    total_pc_count INT NOT NULL
+);
+
+-- 3. Student Identity Directory
+CREATE TABLE student_profiles (
+    student_id VARCHAR(30) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    course_year_section VARCHAR(50) NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- 4. Master Schedules
+CREATE TABLE master_schedules (
+    schedule_id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id VARCHAR(36) NOT NULL,
+    lab_id INT NOT NULL,
+    subject_code VARCHAR(20) NOT NULL,
+    day_of_week VARCHAR(15) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    FOREIGN KEY (teacher_id) REFERENCES users(user_id),
+    FOREIGN KEY (lab_id) REFERENCES lab_rooms(lab_id)
+);
+
+-- 5. Class Roster Enrollments
+CREATE TABLE class_enrollments (
+    schedule_id INT NOT NULL,
+    student_id VARCHAR(30) NOT NULL,
+    PRIMARY KEY (schedule_id, student_id),
+    FOREIGN KEY (schedule_id) REFERENCES master_schedules(schedule_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES student_profiles(student_id) ON DELETE CASCADE
+);
+
+-- 6. Live Active Class Sessions
+CREATE TABLE active_lab_sessions (
+    session_id VARCHAR(36) PRIMARY KEY,
+    schedule_id INT NOT NULL,
+    lab_id INT NOT NULL,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('ACTIVE', 'ENDED') DEFAULT 'ACTIVE',
+    FOREIGN KEY (schedule_id) REFERENCES master_schedules(schedule_id),
+    FOREIGN KEY (lab_id) REFERENCES lab_rooms(lab_id)
+);
+
+-- 7. Scanned Attendance Logs (Camera OCR -> Node.js API)
+CREATE TABLE attendance_logs (
+    log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    session_id VARCHAR(36) NOT NULL,
+    student_id VARCHAR(30) NOT NULL,
+    scan_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('ON_TIME', 'LATE') NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES active_lab_sessions(session_id),
+    FOREIGN KEY (student_id) REFERENCES student_profiles(student_id)
+);
+
+-- 8. [NEW v2.0] Student PC Self-Claiming
+CREATE TABLE pc_occupancy (
+    occupancy_id VARCHAR(36) PRIMARY KEY,
+    session_id VARCHAR(36) NOT NULL,
+    student_id VARCHAR(30) NOT NULL,
+    pc_number INT NOT NULL,
+    claimed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('OCCUPIED', 'FREE') DEFAULT 'OCCUPIED',
+    FOREIGN KEY (session_id) REFERENCES active_lab_sessions(session_id),
+    FOREIGN KEY (student_id) REFERENCES student_profiles(student_id)
+);
+
+-- 9. [NEW v2.0] Direct-to-Dean Technical Feedback
+CREATE TABLE pc_issue_reports (
+    report_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    session_id VARCHAR(36) NOT NULL,
+    student_id VARCHAR(30) NOT NULL,
+    pc_number INT NOT NULL,
+    category ENUM('MOUSE_KEYBOARD', 'MONITOR', 'POWER', 'NETWORK', 'SOFTWARE', 'OTHER') NOT NULL,
+    description TEXT NULL,
+    status ENUM('OPEN', 'RESOLVED') DEFAULT 'OPEN',
+    reported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES active_lab_sessions(session_id),
+    FOREIGN KEY (student_id) REFERENCES student_profiles(student_id)
+);

@@ -6,12 +6,10 @@ import re
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 EXPRESS_API_URL = "http://localhost:5000/api/v1/attendance/scan"
 
-# PSM 11 (Sparse text) works significantly better for isolated ID numbers
 TESSERACT_CONFIG = r'--psm 11 -c tessedit_char_whitelist=0123456789-'
 
 cap = cv2.VideoCapture(0)
 
-# Speed Optimization: Run OCR every 5th frame instead of every frame
 frame_count = 0
 OCR_INTERVAL = 5
 
@@ -29,7 +27,6 @@ try:
         roi = frame[int(height*0.2):int(height*0.8),
                     int(width*0.1):int(width*0.9)]
 
-        # Run OCR ONLY every 5th frame to eliminate video lag
         if frame_count % OCR_INTERVAL == 0 and roi.shape[0] > 0 and roi.shape[1] > 0:
             gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
 
