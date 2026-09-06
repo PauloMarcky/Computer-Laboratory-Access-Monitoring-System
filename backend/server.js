@@ -1,23 +1,24 @@
-const express = require('express');
-const cors = require('cors');
+// server.js
 require('dotenv').config();
+const express = require('express');
+
+// Requiring config/db runs testConnection() and gives you access to pool
+const pool = require('./config/db');
 
 const app = express();
-
-// Basic Middleware
-app.use(cors());
 app.use(express.json());
 
-// Routes
-app.use('/api/v1/attendance', require('./routes/attendanceRoutes'));
-
-// Test Route
-app.get('/', (req, res) => {
-  res.send('CLAMS Backend API is up and running!');
+// Example route using the imported pool
+app.get('/users', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM users');
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// Start Server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`SERVER IS RUNNING ON: http://localhost:${PORT}`);
+  console.log(`Server listening on port ${PORT}`);
 });
