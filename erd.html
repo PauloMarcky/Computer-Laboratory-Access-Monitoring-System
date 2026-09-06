@@ -1,0 +1,145 @@
+<div
+  style="background: #ffffff; padding: 24px; border-radius: 12px; box-shadow: 0 4px 20px rgba(24, 43, 100, 0.08); max-width: 100%; overflow-x: auto;">
+  <h2 class="sr-only">Navy and white entity relationship diagram of the CLAMS database matching the original table
+    styling, with cleaner smooth-angled connector routing</h2>
+  <div id="erd" style="display: flex; justify-content: center;"></div>
+</div>
+
+<script type="module">
+  import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+  await document.fonts.ready;
+
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'base',
+    securityLevel: 'loose',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    themeVariables: {
+      fontSize: '13px',
+      lineColor: '#182B64',
+      textColor: '#1e293b',
+      primaryColor: '#182B64',
+      primaryTextColor: '#FFFFFF',
+      primaryBorderColor: '#182B64',
+      tertiaryColor: '#FFFFFF',
+      attributeBackgroundColorOdd: '#FFFFFF',
+      attributeBackgroundColorEven: '#FFFFFF',
+      mainBkg: '#182B64',
+      nodeBorder: '#182B64',
+      edgeLabelBackground: '#ffffff'
+    },
+  });
+
+  const { svg } = await mermaid.render('erd-svg', `erDiagram
+  USERS ||--|| STUDENT_PROFILES : "1 to 1"
+  USERS ||--o{ MASTER_SCHEDULE : "1 to N"
+  LAB_ROOMS ||--o{ MASTER_SCHEDULE : "1 to N"
+  LAB_ROOMS ||--o{ ACTIVE_LAB_SESSIONS : "1 to N"
+  MASTER_SCHEDULE ||--o{ ACTIVE_LAB_SESSIONS : "1 to N"
+  MASTER_SCHEDULE ||--o{ CLASS_ENROLLMENTS : "1 to N"
+  STUDENT_PROFILES ||--o{ CLASS_ENROLLMENTS : "1 to N"
+  MASTER_SCHEDULE ||--o{ ATTENDANCE_LOG : "1 to N"
+  STUDENT_PROFILES ||--o{ ATTENDANCE_LOG : "1 to N"
+  ACTIVE_LAB_SESSIONS ||--o{ PC_OCCUPANCY : "1 to N"
+  STUDENT_PROFILES ||--o{ PC_OCCUPANCY : "1 to N"
+  ACTIVE_LAB_SESSIONS ||--o{ PC_ISSUE_REPORT : "1 to N"
+  STUDENT_PROFILES ||--o{ PC_ISSUE_REPORT : "1 to N"
+
+  USERS {
+    uuid user_id PK
+    string password
+    string roles
+  }
+  STUDENT_PROFILES {
+    string student_id PK
+    uuid user_id FK
+    string full_name
+    string year_section
+  }
+  LAB_ROOMS {
+    int lab_id PK
+    int total_pc
+  }
+  MASTER_SCHEDULE {
+    string schedule_id PK
+    uuid teacher_id FK
+    string lab_id FK
+    string subject_code
+    time start_time
+    time end_time
+  }
+  CLASS_ENROLLMENTS {
+    int schedule_id PK_FK
+    string student_id PK_FK
+  }
+  ACTIVE_LAB_SESSIONS {
+    uuid session_id PK
+    int schedule_id FK
+    int lab_id FK
+    timestamp started_at
+    string status
+  }
+  ATTENDANCE_LOG {
+    int log_id PK
+    int schedule_id FK
+    int student_id FK
+    timestamp scan_time
+    string status
+  }
+  PC_OCCUPANCY {
+    uuid occupancy_id PK
+    uuid session_id FK
+    string student_id FK
+    string pc_number
+    timestamp claimed_at
+    boolean end_time
+  }
+  PC_ISSUE_REPORT {
+    uuid report_id PK
+    uuid session_id FK
+    string student_id FK
+    string pc_number
+    timestamp reported_at
+    boolean category
+    string description
+  }`);
+
+  const container = document.getElementById('erd');
+  container.innerHTML = svg;
+
+  // Ensure crisp scaling and smooth path rendering
+  const svgElement = container.querySelector('svg');
+  if (svgElement) {
+    svgElement.style.width = '100%';
+    svgElement.style.height = 'auto';
+    svgElement.style.maxWidth = '1200px';
+  }
+
+  document.querySelectorAll('#erd svg.erDiagram path.relationshipLine').forEach(path => {
+    const d = path.getAttribute('d');
+    const nums = d.match(/-?[\d.]+/g)?.map(Number);
+    if (!nums || nums.length < 4) return;
+    const pts = [];
+    for (let i = 0; i < nums.length; i += 2) pts.push([nums[i], nums[i + 1]]);
+    const radius = 10;
+    let newD = `M${pts[0][0]},${pts[0][1]}`;
+    for (let i = 3; i < pts.length - 3; i += 3) {
+      const p0 = pts[i - 3], p1 = pts[i], p2 = pts[i + 3];
+      const d1 = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+      const d2 = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+      const r = Math.min(radius, d1 / 2, d2 / 2);
+      const t1 = d1 ? r / d1 : 0;
+      const t2 = d2 ? r / d2 : 0;
+      const preX = p1[0] - (p1[0] - p0[0]) * t1;
+      const preY = p1[1] - (p1[1] - p0[1]) * t1;
+      const postX = p1[0] + (p2[0] - p1[0]) * t2;
+      const postY = p1[1] + (p2[1] - p1[1]) * t2;
+      newD += ` L${preX},${preY} Q${p1[0]},${p1[1]} ${postX},${postY}`;
+    }
+    const last = pts[pts.length - 1];
+    newD += ` L${last[0]},${last[1]}`;
+    path.setAttribute('d', newD);
+    path.setAttribute('stroke-width', '1.75');
+    path.setAttribute('stroke', '#182B64');
+  });
+</script>
