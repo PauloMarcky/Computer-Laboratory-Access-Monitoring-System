@@ -1,0 +1,14 @@
+# Environment files in root or any subfolder
+.env
+.env*.local
+*.env
+
+# Dependency folders
+node_modules/
+backend/node_modules/
+
+# AI Tool caches
+.agents/
+.claude/
+.cursor/
+.devin/
