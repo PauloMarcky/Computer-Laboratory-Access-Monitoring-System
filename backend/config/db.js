@@ -1,21 +1,18 @@
 require('dotenv').config();
-const mysql = require('mysql2/promise');
+const { PrismaClient } = require('@prisma/client');
 
-// Create the connection pool using your .env variable
-const pool = mysql.createPool(process.env.DATABASE_URL);
+const prisma = new PrismaClient();
 
-// Function to verify connection
+// Verify database connection on initialization
 async function testConnection() {
   try {
-    const connection = await pool.getConnection();
-    console.log('Successfully connected to MySQL database!');
-    connection.release();
+    await prisma.$connect();
+    console.log('Successfully connected to MySQL database via Prisma!');
   } catch (error) {
     console.error('Database connection failed:', error.message);
   }
 }
 
-// Run test on initialization
 testConnection();
 
-module.exports = pool;
+module.exports = prisma;
