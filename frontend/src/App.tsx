@@ -14,11 +14,12 @@ import {
   WireframeScreenId,
 } from './types';
 import { RoleSelectionPage } from './pages/RoleSelectionPage';
-import { AdminLogin } from './components/AdminLogin';
-import { InstructorLogin } from './components/InstructorLogin';
+import { AdminLogin } from './components/AdminComponents/AdminLogin';
+import { InstructorLogin } from './components/InstructorComponents/InstructorLogin';
 import { LabStaffLogin } from './components/LabStaffLogin';
 import { StudentLogin } from './components/StudentLogin';
 import { LiveAttendancePage } from './pages/InstructorPages/LiveAttendancePage';
+import { InstructorSessionVerificationPage } from './pages/InstructorPages/InstructorSessionVerificationPage';
 import { ExportAttendancePage } from './pages/InstructorPages/ExportAttendancePage';
 import { StudentClaimPCView, StudentReportIssueView } from './components/StudentViews';
 import {
@@ -27,13 +28,23 @@ import {
   LabStaffReportExportView,
   LabStaffRoomsView,
 } from './components/LabStaffViews';
-import {
-  AdminReportsDashboardView,
-  AdminScheduleAddView,
-  AdminScheduleModuleView,
-  AdminStudentsAnalyticsView,
-  AdminTeacherWorkloadView,
-} from './components/AdminViews';
+import { AdminScheduleAddView, AdminScheduleModuleView } from './pages/AdminPages/ScheduleManager';
+import { AdminTeacherWorkloadView } from './pages/AdminPages/InstructorWorkload';
+import { AdminReportsDashboardView } from './pages/AdminPages/ClassReports';
+import { AdminStudentsAnalyticsView } from './pages/AdminPages/AnalyticsReport';
+
+const addTwoHours = (time: string) => {
+  const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return '04:00 PM';
+
+  let hour = Number(match[1]) % 12;
+  if (match[3].toUpperCase() === 'PM') hour += 12;
+  const startMinutes = hour * 60 + Number(match[2]);
+  const endMinutes = Math.min(startMinutes + 120, 23 * 60 + 59);
+  const endHour = Math.floor(endMinutes / 60);
+  const period = endHour >= 12 ? 'PM' : 'AM';
+  return `${String(endHour % 12 || 12).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')} ${period}`;
+};
 
 const WIREFRAME_SCREENS: Array<{
   id: WireframeScreenId;
@@ -45,6 +56,11 @@ const WIREFRAME_SCREENS: Array<{
     { id: 'lab-staff-login', label: 'Lab staff login', roleGroup: 'Lab Staff' },
     { id: 'student-login', label: 'Student login', roleGroup: 'Student' },
     { id: 'admin-login', label: 'Administrator login', roleGroup: 'Admin' },
+    {
+      id: 'instructor-session-verification',
+      label: 'Instructor session verification',
+      roleGroup: 'Instructor',
+    },
     {
       id: 'instructor-attendance-module',
       label: '2. instructor-attendance-module',
@@ -220,17 +236,11 @@ export default function App() {
     day: ScheduleEntry['day'] = 'Mon',
     startTime = '02:00 PM'
   ) => {
-    const startIdx = ['08:00 AM', '10:00 AM', '12:00 PM', '02:00 PM', '04:00 PM'].indexOf(
-      startTime
-    );
-    const endTimes = ['10:00 AM', '12:00 PM', '02:00 PM', '04:00 PM', '06:00 PM'];
-    const endTime = startIdx >= 0 ? endTimes[startIdx] : '04:00 PM';
-
     setEditingSchedule({
       id: `sch-${Date.now()}`,
       day,
       startTime,
-      endTime,
+      endTime: addTwoHours(startTime),
       subject: '',
       teacher: '',
       room: '',
@@ -275,6 +285,13 @@ export default function App() {
 
         {currentScreen === 'instructor-login' && (
           <InstructorLogin onNavigate={setCurrentScreen} />
+        )}
+
+        {currentScreen === 'instructor-session-verification' && (
+          <InstructorSessionVerificationPage
+            schedules={schedules}
+            onNavigate={setCurrentScreen}
+          />
         )}
 
         {currentScreen === 'lab-staff-login' && (

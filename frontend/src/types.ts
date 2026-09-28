@@ -4,6 +4,7 @@ export type WireframeScreenId =
   | 'lab-staff-login'
   | 'student-login'
   | 'admin-login'
+  | 'instructor-session-verification'
   | 'instructor-attendance-module'
   | 'instructor-attendance-export'
   | 'student-claim-pc'

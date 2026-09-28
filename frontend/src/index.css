@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
 @layer base {
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     color: #0f172a;
@@ -21,6 +30,7 @@
   .no-print {
     display: none !important;
   }
+
   body {
     background-color: #ffffff !important;
   }

@@ -1,5 +1,5 @@
-import { RoleLoginForm } from './RoleLoginForm';
-import type { RoleLoginProps } from './RoleLoginForm';
+import { RoleLoginForm } from '../RoleLoginForm';
+import type { RoleLoginProps } from '../RoleLoginForm';
 
 export const InstructorLogin = ({ onNavigate }: RoleLoginProps) => (
   <RoleLoginForm
@@ -9,7 +9,7 @@ export const InstructorLogin = ({ onNavigate }: RoleLoginProps) => (
     identityLabel="Faculty email"
     identityPlaceholder="Enter your ID number"
     identityType="email"
-    destination="instructor-attendance-module"
+    destination="instructor-session-verification"
     accent="text-[#1d3663]"
   />
 );

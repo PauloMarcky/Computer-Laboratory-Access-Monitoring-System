@@ -1,5 +1,5 @@
 import { ArrowLeft, Printer } from 'lucide-react';
-import type { AttendanceEntry, WireframeScreenId } from '../types';
+import type { AttendanceEntry, WireframeScreenId } from '../../types';
 
 interface InstructorAttendanceExportViewProps {
   attendance: AttendanceEntry[];

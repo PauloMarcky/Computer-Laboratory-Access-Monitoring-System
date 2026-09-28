@@ -1,5 +1,5 @@
-import { RoleLoginForm } from './RoleLoginForm';
-import type { RoleLoginProps } from './RoleLoginForm';
+import { RoleLoginForm } from '../RoleLoginForm';
+import type { RoleLoginProps } from '../RoleLoginForm';
 
 export const AdminLogin = ({ onNavigate }: RoleLoginProps) => (
   <RoleLoginForm

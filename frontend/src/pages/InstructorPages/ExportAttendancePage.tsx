@@ -1,5 +1,5 @@
 import { ClipboardList, MonitorCheck } from 'lucide-react';
-import { InstructorAttendanceExportView } from '../../components/InstructorAttendanceExportView';
+import { InstructorAttendanceExportView } from '../../components/InstructorComponents/InstructorAttendanceExportView';
 import type { AttendanceEntry, WireframeScreenId } from '../../types';
 
 interface ExportAttendancePageProps {

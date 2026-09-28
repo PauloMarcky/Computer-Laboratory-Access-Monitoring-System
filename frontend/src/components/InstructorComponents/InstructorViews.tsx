@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CheckCircle2, UserPlus, Play, Square } from 'lucide-react';
-import { ClamsHeader } from './ClamsHeader';
-import { AttendanceEntry, WireframeScreenId } from '../types';
+import { ClamsHeader } from '../ClamsHeader';
+import { AttendanceEntry, WireframeScreenId } from '../../types';
 
 interface InstructorAttendanceProps {
   attendance: AttendanceEntry[];

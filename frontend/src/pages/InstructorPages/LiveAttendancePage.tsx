@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { CameraScanner, type MatchedStudent } from '../../components/CameraScanner';
-import { InstructorAttendanceView } from '../../components/InstructorViews';
+import { CameraScanner, type MatchedStudent } from '../../components/InstructorComponents/CameraScanner';
+import { InstructorAttendanceView } from '../../components/InstructorComponents/InstructorViews';
 import type { AttendanceEntry, WireframeScreenId } from '../../types';
 
 interface LiveAttendancePageProps {
