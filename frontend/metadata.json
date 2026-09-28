@@ -1,0 +1,6 @@
+{
+  "name": "CLAMS — University of La Salette Computer Lab Attendance & Management System",
+  "description": "Computer Laboratory Attendance and Management System (CLAMS) for University of La Salette, Inc. featuring Instructor Console, Student Seat Claim, Laboratory Staff Verification, and Administrator Portal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,24 +1,18 @@
-// server.js
 require('dotenv').config();
 const express = require('express');
-
-// Requiring config/db runs testConnection() and gives you access to pool
-const pool = require('./config/db');
+const cors = require('cors');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors()); // frontend (Vite, port 3001) calls this API directly from the browser
 app.use(express.json());
 
-// Example route using the imported pool
-app.get('/users', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM users');
-    res.json(rows);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+app.use('/api/users', require('./routes/user-routes'));
+app.use('/api/v1/attendance', require('./routes/attendance-routes'));
 
-const PORT = process.env.PORT || 3000;
+// Start Server
 app.listen(PORT, () => {
+  console.log(`Server running at: http://localhost:${PORT}`);
   console.log(`Server listening on port ${PORT}`);
 });

@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CLAMS - Computer Laboratory Access Monitoring System</title>
+  <link rel="stylesheet" href="css.css" />
+</head>
+
+<body>
+
+  <!-- Dev Screen Switcher Toolbar -->
+  <div id="screen-switcher-bar">
+    <label for="module-select">SELECT MODULE VIEW:</label>
+    <select id="module-select" onchange="switchModule(this.value)">
+      <option value="login-portal">1. Login Portal</option>
+      <option value="instructor-attendance-module">2. Instructor Attendance Module</option>
+      <option value="attendance-report-export">3. Official Attendance Report Document</option>
+      <option value="student-seats-claim">4. Student Seats Claim</option>
+      <option value="student-report-issue">5. Student Report PC Issue</option>
+      <option value="lab-staff-rooms-module">6. Laboratory Staff - Rooms View</option>
+      <option value="admin-schedule-module">7. Admin - Schedules Grid</option>
+      <option value="admin-schedule-details">8. Admin - Schedule Details Form</option>
+      <option value="admin-teacher-assignment">9. Admin - Teacher Assignment & Workload</option>
+      <option value="admin-issue-reports">10. Admin - PC Issue Reports Queue</option>
+      <option value="admin-attendance-analytics">11. Admin - Attendance Analytics</option>
+    </select>
+  </div>
+
+  <!-- MODULE 1: LOGIN PORTAL -->
+  <div id="login-portal" class="clams-module-screen active-screen">
+    <div class="login-wrapper">
+      <div style="text-align: center; width: 100%;">
+        <h1 style="color: var(--primary-navy); margin-bottom: 4px;">CLAMS</h1>
+        <p style="color: var(--text-muted); margin-bottom: 24px;">University of La Salette, Inc.</p>
+        <p style="font-weight: 600; margin-bottom: 12px;">SELECT ACCESS LEVEL</p>
+        <div class="login-grid" style="margin: 0 auto;">
+          <div class="login-portal-card">
+            <h3>Instructor Console</h3>
+          </div>
+          <div class="login-portal-card">
+            <h3>Laboratory Staff</h3>
+          </div>
+          <div class="login-portal-card">
+            <h3>Student Seats Claim</h3>
+          </div>
+          <div class="login-portal-card">
+            <h3>Administrator Portal</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 2: INSTRUCTOR ATTENDANCE MODULE -->
+  <div id="instructor-attendance-module" class="clams-module-screen">
+    <header class="clams-navbar">
+      <div class="brand-section">
+        <div class="brand-logo">C</div>
+        <div>
+          <div class="brand-title">CLAMS</div>
+          <div class="brand-subtitle">University of La Salette, Inc.</div>
+        </div>
+      </div>
+      <div class="status-badge">Computer Laboratory 1 • Active</div>
+    </header>
+
+    <div class="main-container">
+      <div class="clams-card" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h2 style="color: var(--status-green-text); font-size: 1.2rem;">● Active Lab Session Unlocked</h2>
+          <p style="color: var(--text-muted); font-size: 0.9rem;">Subject: IT201 - Data Structures | Room: Com Lab 301 |
+            Instructor: Prof. Ramon</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-secondary">Stop Class</button>
+          <button class="btn btn-danger">End Session & Export UGE</button>
+        </div>
+      </div>
+
+      <div class="grid-2col">
+        <div class="clams-card">
+          <div class="card-header">
+            <h3 class="card-title">Live Attendance Sheet (Today)</h3>
+          </div>
+          <table class="clams-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>PC #</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>08:02 AM</td>
+                <td>24-10270</td>
+                <td>Marcky Paulo Balaba</td>
+                <td>PC-01</td>
+                <td><span class="status-pill on-time">On Time</span></td>
+              </tr>
+              <tr>
+                <td>08:03 AM</td>
+                <td>24-10800</td>
+                <td>Lanther Han Serrano</td>
+                <td>PC-02</td>
+                <td><span class="status-pill on-time">On Time</span></td>
+              </tr>
+              <tr>
+                <td>08:18 AM</td>
+                <td>24-10330</td>
+                <td>Adrian Lester Santiago</td>
+                <td>PC-03</td>
+                <td><span class="status-pill late">Late</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="clams-card">
+          <div class="card-header">
+            <h3 class="card-title">Terminal Barcode Scanner</h3>
+          </div>
+          <div class="scanner-box">
+            <div style="font-size: 2rem; margin-bottom: 8px;">📷</div>
+            <p>Align Student ID Here</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 3: OFFICIAL ATTENDANCE REPORT DOCUMENT -->
+  <div id="attendance-report-export" class="clams-module-screen">
+    <div style="padding: 20px; text-align: right; max-width: 900px; margin: 0 auto;">
+      <button class="btn btn-primary" onclick="window.print()">Print Document</button>
+    </div>
+    <div class="document-container">
+      <div class="doc-header">
+        <h2>UNIVERSITY OF LA SALETTE, INC.</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Santiago City, Isabela</p>
+        <h3 style="margin-top: 12px; font-weight: 700;">COLLEGE OF INFORMATION TECHNOLOGY - COMPUTER LABORATORY ACCESS
+          LOG</h3>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 16px;">
+        <div>
+          <p><strong>Subject Code:</strong> IT201 (Data Structures)</p>
+          <p><strong>Instructor Name:</strong> Prof. Ramon</p>
+        </div>
+        <div>
+          <p><strong>Room:</strong> Com Lab 301</p>
+          <p><strong>Date/Time:</strong> Oct 24, 2026 | 08:00 AM - 10:00 AM</p>
+        </div>
+      </div>
+      <table class="clams-table" style="border: 1px solid var(--border-color);">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Student ID</th>
+            <th>Student Name</th>
+            <th>Time In</th>
+            <th>PC #</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>24-10270</td>
+            <td>Marcky Paulo Balaba</td>
+            <td>08:02 AM</td>
+            <td>PC-01</td>
+            <td>On Time</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>24-10800</td>
+            <td>Lanther Han Serrano</td>
+            <td>08:03 AM</td>
+            <td>PC-02</td>
+            <td>On Time</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>24-10330</td>
+            <td>Adrian Lester Santiago</td>
+            <td>08:18 AM</td>
+            <td>PC-03</td>
+            <td>Late</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="doc-signatures">
+        <div class="signature-line">Prepared By:<br><strong>Instructor Signature</strong></div>
+        <div class="signature-line">Verified By:<br><strong>Lab Custodian / Staff</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 4: STUDENT SEATS CLAIM -->
+  <div id="student-seats-claim" class="clams-module-screen">
+    <header class="clams-navbar">
+      <div class="brand-section">
+        <div class="brand-logo">C</div>
+        <div class="brand-title">CLAMS</div>
+      </div>
+      <div class="status-badge">Student PC Selection</div>
+    </header>
+    <div class="main-container" style="max-width: 800px;">
+      <div class="clams-card">
+        <h2>You are on PC-01</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">Select an available PC terminal to
+          claim your seat for this session.</p>
+        <div
+          style="background-color: #fef9c3; border-left: 4px solid #eab308; padding: 12px; font-size: 0.85rem; margin-bottom: 20px;">
+          Please claim the station you are currently sitting at. Unassigned claims are subject to monitoring.
+        </div>
+        <div class="card-header">
+          <h3 class="card-title">Select Station</h3>
+        </div>
+        <div class="seat-grid">
+          <div class="seat-btn selected">PC-01</div>
+          <div class="seat-btn occupied">PC-02</div>
+          <div class="seat-btn occupied">PC-03</div>
+          <div class="seat-btn">PC-04</div>
+          <div class="seat-btn">PC-05</div>
+          <div class="seat-btn">PC-06</div>
+          <div class="seat-btn">PC-07</div>
+          <div class="seat-btn">PC-08</div>
+          <div class="seat-btn">PC-09</div>
+          <div class="seat-btn">PC-10</div>
+          <div class="seat-btn">PC-11</div>
+          <div class="seat-btn">PC-12</div>
+        </div>
+        <div style="margin-top: 24px; text-align: center;">
+          <button class="btn btn-primary" style="width: 100%; padding: 12px;">Confirm & Claim Station</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 5: STUDENT REPORT ISSUE -->
+  <div id="student-report-issue" class="clams-module-screen">
+    <header class="clams-navbar">
+      <div class="brand-section">
+        <div class="brand-logo">C</div>
+        <div class="brand-title">CLAMS</div>
+      </div>
+    </header>
+    <div class="main-container" style="max-width: 700px;">
+      <div class="clams-card">
+        <h2 style="margin-bottom: 16px;">Report a PC Issue</h2>
+        <div class="form-group">
+          <label>Issue Category</label>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-primary">Mouse / Keyboard</button>
+            <button class="btn btn-secondary">Monitor</button>
+            <button class="btn btn-secondary">No Internet</button>
+            <button class="btn btn-secondary">OS Freeze</button>
+            <button class="btn btn-secondary">Other</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label for="issue-description">Description / Notes</label>
+          <textarea id="issue-description" class="form-control" rows="4"
+            placeholder="Describe the hardware or software problem..."></textarea>
+        </div>
+        <button class="btn btn-primary" style="width: 100%; padding: 12px;">Submit Issue Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 6: LAB STAFF ROOMS VIEW -->
+  <div id="lab-staff-rooms-module" class="clams-module-screen">
+    <header class="clams-navbar">
+      <div class="brand-section">
+        <div class="brand-logo">C</div>
+        <div class="brand-title">CLAMS Staff Dashboard</div>
+      </div>
+    </header>
+    <nav class="clams-subnav">
+      <a href="#" class="subnav-link active">LAB ACTIVITY</a>
+      <a href="#" class="subnav-link">REPORTS</a>
+    </nav>
+    <div class="main-container">
+      <h2 style="margin-bottom: 16px;">3 Active Laboratories</h2>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+        <div class="clams-card">
+          <div class="card-header">
+            <h3 class="card-title">Computer Lab 301</h3>
+            <span class="status-pill active">22 / 40 Seats</span>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">IT201 - Data Structures</p>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Instructor: Prof. Ramon</p>
+          <button class="btn btn-secondary" style="margin-top: 16px; width: 100%;">View Room Details</button>
+        </div>
+        <div class="clams-card">
+          <div class="card-header">
+            <h3 class="card-title">Computer Lab 302</h3>
+            <span class="status-pill active">32 / 40 Seats</span>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">CS302 - System Integration</p>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Instructor: Prof. Abad</p>
+          <button class="btn btn-secondary" style="margin-top: 16px; width: 100%;">View Room Details</button>
+        </div>
+        <div class="clams-card">
+          <div class="card-header">
+            <h3 class="card-title">Mac Studio Lab</h3>
+            <span class="status-pill active">18 / 20 Seats</span>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">ITE305 - Mobile Dev</p>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Instructor: Prof. Torres</p>
+          <button class="btn btn-secondary" style="margin-top: 16px; width: 100%;">View Room Details</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 7: ADMIN SCHEDULES GRID -->
+  <div id="admin-schedule-module" class="clams-module-screen">
+    <header class="clams-navbar">
+      <div class="brand-section">
+        <div class="brand-logo">C</div>
+        <div class="brand-title">CLAMS Admin</div>
+      </div>
+    </header>
+    <nav class="clams-subnav">
+      <a href="#" class="subnav-link active">SCHEDULES</a>
+      <a href="#" class="subnav-link">REPORTS</a>
+      <a href="#" class="subnav-link">ANALYTICS</a>
+    </nav>
+    <div class="main-container">
+      <div class="clams-card" style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; gap: 16px;">
+          <select class="form-select" style="width: auto;">
+            <option>Lab Room: All Rooms</option>
+          </select>
+          <select class="form-select" style="width: auto;">
+            <option>Department: All Depts</option>
+          </select>
+        </div>
+        <button class="btn btn-primary">+ Create Schedule</button>
+      </div>
+
+      <div class="clams-card">
+        <div class="timetable-grid">
+          <div class="timetable-header">Time</div>
+          <div class="timetable-header">Monday</div>
+          <div class="timetable-header">Tuesday</div>
+          <div class="timetable-header">Wednesday</div>
+          <div class="timetable-header">Thursday</div>
+          <div class="timetable-header">Friday</div>
+
+          <div class="timetable-time">08:00 AM</div>
+          <div class="schedule-card-slot">Chemistry I Lab<br><small>Lab-104</small></div>
+          <div></div>
+          <div class="schedule-card-slot">Intro to Biology<br><small>Lab-204</small></div>
+          <div></div>
+          <div></div>
+
+          <div class="timetable-time">10:00 AM</div>
+          <div></div>
+          <div class="schedule-card-slot">System Integration<br><small>Lab 301</small></div>
+          <div></div>
+          <div></div>
+          <div class="schedule-card-slot">Intro to Computing<br><small>Lab 302</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 8: ADMIN SCHEDULE DETAILS FORM -->
+  <div id="admin-schedule-details" class="clams-module-screen">
+    <header class="clams-navbar">
+      <div class="brand-section">
+        <div class="brand-logo">C</div>
+        <div class="brand-title">CLAMS Admin</div>
+      </div>
+    </header>
+    <div class="main-container" style="max-width: 800px;">
+      <div class="clams-card">
+        <h2 style="margin-bottom: 20px;">Schedule Details</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label for="sched-subject">Subject/Course</label>
+            <input id="sched-subject" type="text" class="form-control" value="Data Structures" />
+          </div>
+          <div class="form-group">
+            <label for="sched-room">Assigned Lab Room</label>
+            <select id="sched-room" class="form-select">
+              <option>Computer Lab 301</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="sched-instructor">Assigned Instructor</label>
+            <select id="sched-instructor" class="form-select">
+              <option>Prof. Bienvenido Abad</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="sched-time">Schedule Time Slot</label>
+            <input id="sched-time" type="text" class="form-control" value="08:00 AM - 10:00 AM" />
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+          <button class="btn btn-secondary">Cancel</button>
+          <button class="btn btn-primary">Save Schedule Slot</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 9: ADMIN TEACHER ASSIGNMENT -->
+  <div id="admin-teacher-assignment" class="clams-module-screen">
+    <header class="clams-navbar">
+      <div class="brand-section">
+        <div class="brand-logo">C</div>
+        <div class="brand-title">CLAMS Admin</div>
+      </div>
+    </header>
+    <div class="main-container">
+      <div class="clams-card">
+        <h2 style="margin-bottom: 16px;">Teacher Assignment & Workload</h2>
+        <table class="clams-table">
+          <thead>
+            <tr>
+              <th>Teacher Name</th>
+              <th>Department</th>
+              <th>Assigned Subjects</th>
+              <th>Total Hours</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Prof. Bienvenido Abad</td>
+              <td>BSIT</td>
+              <td>System Integration, Data Structures</td>
+              <td>18 hrs/wk</td>
+              <td><button class="btn btn-secondary">Edit Workload</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 10: ADMIN ISSUE REPORTS QUEUE -->
+  <div id="admin-issue-reports" class="clams-module-screen">
+    <header class="clams-navbar">
+      <div class="brand-section">
+        <div class="brand-logo">C</div>
+        <div class="brand-title">CLAMS Admin</div>
+      </div>
+    </header>
+    <div class="main-container">
+      <div class="clams-card">
+        <h2>Reported PC Issues</h2>
+        <table class="clams-table" style="margin-top: 16px;">
+          <thead>
+            <tr>
+              <th>Room</th>
+              <th>PC #</th>
+              <th>Issue Description</th>
+              <th>Reported By</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Lab 301</td>
+              <td>PC-04</td>
+              <td>Mouse cursor unresponsive</td>
+              <td>Student (24-10270)</td>
+              <td><span class="status-pill late">Pending</span></td>
+              <td><button class="btn btn-primary">Resolve Issue</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 11: ADMIN ATTENDANCE ANALYTICS -->
+  <div id="admin-attendance-analytics" class="clams-module-screen">
+    <header class="clams-navbar">
+      <div class="brand-section">
+        <div class="brand-logo">C</div>
+        <div class="brand-title">CLAMS Admin</div>
+      </div>
+    </header>
+    <div class="main-container">
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <p style="color: var(--text-muted); font-size: 0.85rem;">Total Students Tracked</p>
+          <div class="metric-number">420</div>
+        </div>
+        <div class="metric-card">
+          <p style="color: var(--text-muted); font-size: 0.85rem;">Overall Attendance Rate</p>
+          <div class="metric-number" style="color: var(--status-green-text);">94.8%</div>
+        </div>
+        <div class="metric-card">
+          <p style="color: var(--text-muted); font-size: 0.85rem;">Total Absences</p>
+          <div class="metric-number" style="color: var(--danger-red);">112</div>
+        </div>
+        <div class="metric-card">
+          <p style="color: var(--text-muted); font-size: 0.85rem;">Flagged Records</p>
+          <div class="metric-number" style="color: var(--status-yellow-text);">3</div>
+        </div>
+      </div>
+
+      <div class="clams-card">
+        <h3>Attendance Analytics Overview</h3>
+        <div
+          style="height: 200px; background-color: #f8fafc; border: 1px dashed #cbd5e1; display: flex; align-items: center; justify-content: center; color: var(--text-muted); margin-top: 16px;">
+          📊 Chart Visualizations (Monthly Absences & Top Flagged Absences)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Module View Switcher Script -->
+  <script>
+    function switchModule(moduleId) {
+      const screens = document.querySelectorAll('.clams-module-screen');
+      screens.forEach(screen => screen.classList.remove('active-screen'));
+
+      const targetScreen = document.getElementById(moduleId);
+      if (targetScreen) {
+        targetScreen.classList.add('active-screen');
+      }
+    }
+  </script>
+</body>
+
+</html>

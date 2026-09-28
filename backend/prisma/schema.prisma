@@ -16,36 +16,51 @@ enum Role {
 
 model User {
   id        Int      @id @default(autoincrement()) @map("user_id")
-  username  String   @unique
+  schoolId  String   @unique @map("id_number")
   password  String
   role      Role     @default(STUDENT)
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  studentProfile StudentProfile?
-  schedules      Schedule[]
+  studentProfile        StudentProfile?
+  instructorProfile     InstructorProfile?
+  handledPcIssueReports PcIssueReport[]    @relation("CustodianHandledReports")
 
   @@map("users")
 }
 
 model StudentProfile {
-  id            Int      @id @default(autoincrement()) @map("student_profile_id")
-  userId        Int      @unique @map("user_id")
-  studentNumber String   @unique @map("student_number")
-  firstName     String   @map("first_name")
-  lastName      String   @map("last_name")
-  course        String?
-  yearLevel     Int?     @map("year_level")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id        Int      @id @default(autoincrement()) @map("student_profile_id")
+  studentId Int      @unique @map("schoolId") // Foreign key to User.id
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  course    String?
+  yearLevel Int?     @map("year_level")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [studentId], references: [id], onDelete: Cascade)
   attendanceLogs   AttendanceLog[]
   classEnrollments ClassEnrollment[]
   pcOccupancies    PcOccupancy[]
   pcIssueReports   PcIssueReport[]
 
   @@map("student_profiles")
+}
+
+model InstructorProfile {
+  id           Int      @id @default(autoincrement()) @map("instructor_profile_id")
+  instructorId Int      @unique @map("instructor_id") // Foreign key to User.id
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  department   String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user      User       @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  schedules Schedule[]
+
+  @@map("instructor_profiles")
 }
 
 model LabRoom {
@@ -63,7 +78,7 @@ model LabRoom {
 
 model Schedule {
   id           Int      @id @default(autoincrement()) @map("schedule_id")
-  instructorId Int      @map("instructor_id")
+  instructorId Int      @map("instructor_id") // Foreign key referencing InstructorProfile.id
   labRoomId    Int      @map("lab_room_id")
   subjectCode  String   @map("subject_code")
   dayOfWeek    String   @map("day_of_week")
@@ -72,7 +87,7 @@ model Schedule {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  instructor       User              @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  instructor       InstructorProfile @relation(fields: [instructorId], references: [id], onDelete: Cascade)
   labRoom          LabRoom           @relation(fields: [labRoomId], references: [id], onDelete: Cascade)
   classEnrollments ClassEnrollment[]
   activeSessions   ActiveSession[]
@@ -139,13 +154,17 @@ model PcIssueReport {
   id               Int      @id @default(autoincrement()) @map("pc_issue_report_id")
   activeSessionId  Int      @map("active_session_id")
   studentProfileId Int      @map("student_profile_id")
+  handledById      Int?     @map("handled_by_id")
   pcNumber         String   @map("pc_number")
   issueDescription String   @map("issue_description") @db.Text
   status           String   @default("PENDING")
+  staffNotes       String?  @map("staff_notes") @db.Text
   reportedAt       DateTime @default(now()) @map("reported_at")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
 
   activeSession  ActiveSession  @relation(fields: [activeSessionId], references: [id], onDelete: Cascade)
   studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  handledBy      User?          @relation("CustodianHandledReports", fields: [handledById], references: [id], onDelete: SetNull)
 
   @@map("pc_issue_report")
 }

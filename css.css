@@ -1,0 +1,454 @@
+/* ==========================================================================
+   CLAMS - Main Application Styles
+   ========================================================================== */
+
+:root {
+  --primary-navy: #1a233a;
+  --secondary-navy: #2d3748;
+  --accent-blue: #2563eb;
+  --accent-blue-hover: #1d4ed8;
+  --danger-red: #dc2626;
+  --danger-red-hover: #b91c1c;
+  --bg-gray: #f4f6f9;
+  --card-bg: #ffffff;
+  --border-color: #e2e8f0;
+  --text-dark: #1e293b;
+  --text-muted: #64748b;
+  --status-green-bg: #dcfce7;
+  --status-green-text: #15803d;
+  --status-yellow-bg: #fef9c3;
+  --status-yellow-text: #a16207;
+  --status-blue-bg: #dbeafe;
+  --status-blue-text: #1e40af;
+  --radius: 8px;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  background-color: var(--bg-gray);
+  color: var(--text-dark);
+  line-height: 1.5;
+}
+
+/* Screen Switcher (Preview Controller) */
+#screen-switcher-bar {
+  background-color: #0f172a;
+  color: #fff;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 9999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+#screen-switcher-bar label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+#screen-switcher-bar select {
+  background-color: #1e293b;
+  color: #fff;
+  border: 1px solid #475569;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  outline: none;
+}
+
+/* Main Container Module Visibility */
+.clams-module-screen {
+  display: none;
+  min-height: calc(100vh - 50px);
+}
+
+.clams-module-screen.active-screen {
+  display: block;
+}
+
+/* Global Header / Navbar */
+.clams-navbar {
+  background-color: var(--primary-navy);
+  color: #ffffff;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow);
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  background-color: #f59e0b;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  color: var(--primary-navy);
+}
+
+.brand-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.brand-subtitle {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.status-badge {
+  font-size: 0.8rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 4px 12px;
+  border-radius: 12px;
+  color: #cbd5e1;
+}
+
+/* Tab Navigation */
+.clams-subnav {
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 24px;
+  display: flex;
+  gap: 20px;
+}
+
+.subnav-link {
+  padding: 12px 4px;
+  text-decoration: none;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-bottom: 2px solid transparent;
+}
+
+.subnav-link.active {
+  color: var(--accent-blue);
+  border-bottom-color: var(--accent-blue);
+}
+
+/* Layout Content Wrapper */
+.main-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Generic Card Component */
+.clams-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary-navy);
+}
+
+/* Form Controls & Buttons */
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-primary {
+  background-color: var(--accent-blue);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-blue-hover);
+}
+
+.btn-danger {
+  background-color: var(--danger-red);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background-color: var(--danger-red-hover);
+}
+
+.btn-secondary {
+  background-color: #e2e8f0;
+  color: var(--text-dark);
+}
+
+.btn-secondary:hover {
+  background-color: #cbd5e1;
+}
+
+.form-control,
+.form-select {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  outline: none;
+  width: 100%;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--secondary-navy);
+}
+
+/* Tables */
+.clams-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.clams-table th {
+  background-color: #f8fafc;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.clams-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.status-pill {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.status-pill.on-time {
+  background-color: var(--status-green-bg);
+  color: var(--status-green-text);
+}
+
+.status-pill.late {
+  background-color: var(--status-yellow-bg);
+  color: var(--status-yellow-text);
+}
+
+.status-pill.active {
+  background-color: var(--status-blue-bg);
+  color: var(--status-blue-text);
+}
+
+/* --- MODULE SPECIFIC STYLES --- */
+
+/* 1. Login Portal */
+.login-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
+}
+
+.login-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  width: 100%;
+  max-width: 600px;
+  margin-top: 20px;
+}
+
+.login-portal-card {
+  text-align: center;
+  padding: 30px 20px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: #fff;
+}
+
+.login-portal-card:hover {
+  border-color: var(--accent-blue);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+/* 2. Instructor Attendance Layout */
+.grid-2col {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+.scanner-box {
+  border: 2px dashed #cbd5e1;
+  border-radius: var(--radius);
+  height: 250px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-muted);
+  background-color: #f8fafc;
+}
+
+/* 3. Seat Grid Module */
+.seat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.seat-btn {
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: #f8fafc;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+}
+
+.seat-btn.selected {
+  background-color: var(--primary-navy);
+  color: #fff;
+  border-color: var(--primary-navy);
+}
+
+.seat-btn.occupied {
+  background-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* 4. Schedule Grid */
+.timetable-grid {
+  display: grid;
+  grid-template-columns: 80px repeat(5, 1fr);
+  gap: 8px;
+}
+
+.timetable-header {
+  font-weight: 700;
+  text-align: center;
+  padding: 8px;
+  background-color: #f1f5f9;
+  border-radius: 4px;
+}
+
+.timetable-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+.schedule-card-slot {
+  background-color: var(--status-blue-bg);
+  border-left: 4px solid var(--accent-blue);
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+/* 5. Analytics Metric Grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.metric-card {
+  background-color: #fff;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+}
+
+.metric-number {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--primary-navy);
+}
+
+/* 6. Official Document View */
+.document-container {
+  background-color: #fff;
+  padding: 40px;
+  max-width: 900px;
+  margin: 0 auto;
+  border: 1px solid #cbd5e1;
+  box-shadow: var(--shadow);
+}
+
+.doc-header {
+  text-align: center;
+  border-bottom: 2px solid var(--primary-navy);
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+}
+
+.doc-signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 60px;
+}
+
+.signature-line {
+  border-top: 1px solid var(--text-dark);
+  width: 200px;
+  text-align: center;
+  padding-top: 4px;
+  font-size: 0.85rem;
+}
