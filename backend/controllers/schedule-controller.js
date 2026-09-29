@@ -7,7 +7,7 @@ const include = {
 };
 
 async function createSchedule(req, res) {
-  const { instructorId, labRoomId, subjectCode, dayOfWeek, startTime, endTime } = req.body || {};
+  const { instructorId, labRoomId, subjectCode, dayOfWeek, startTime, endTime, semester } = req.body || {};
   const start = parseTime(startTime);
   const end = parseTime(endTime);
 
@@ -37,6 +37,7 @@ async function createSchedule(req, res) {
       dayOfWeek: day,
       startTime: start,
       endTime: end,
+      semester: typeof semester === 'string' && semester.trim() ? semester.trim() : null,
     },
     include,
   });
@@ -79,7 +80,7 @@ async function getSchedule(req, res) {
 async function updateSchedule(req, res) {
   const id = toId(req.params.id);
   if (!id) return res.status(400).json({ error: 'Invalid id.' });
-  const { instructorId, labRoomId, subjectCode, dayOfWeek, startTime, endTime } = req.body || {};
+  const { instructorId, labRoomId, subjectCode, dayOfWeek, startTime, endTime, semester } = req.body || {};
   const data = {};
   if (instructorId !== undefined) data.instructorId = Number(instructorId);
   if (labRoomId !== undefined) data.labRoomId = Number(labRoomId);
@@ -95,6 +96,9 @@ async function updateSchedule(req, res) {
   if (endTime !== undefined) {
     data.endTime = parseTime(endTime);
     if (!data.endTime) return res.status(400).json({ error: 'Invalid endTime.' });
+  }
+  if (semester !== undefined) {
+    data.semester = typeof semester === 'string' && semester.trim() ? semester.trim() : null;
   }
   const schedule = await prisma.schedule.update({ where: { id }, data, include });
   return res.json({ schedule });

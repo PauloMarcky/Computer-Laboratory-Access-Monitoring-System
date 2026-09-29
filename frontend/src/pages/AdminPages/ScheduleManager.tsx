@@ -2,12 +2,19 @@ import React, { useState } from 'react';
 import { Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { ClamsHeader } from '../../components/ClamsHeader';
 import { AdminSubNav } from '../../components/AdminComponents/AdminSubNav';
-import type { ScheduleEntry, WireframeScreenId } from '../../types';
+import type {
+  ScheduleEntry,
+  ScheduleInstructorOption,
+  ScheduleLabRoomOption,
+  WireframeScreenId,
+} from '../../types';
 
 interface AdminScheduleModuleProps {
   schedules: ScheduleEntry[];
   onEditSchedule: (entry: ScheduleEntry) => void;
   onCreateNewSchedule: (day?: ScheduleEntry['day'], startTime?: string) => void;
+  isLoading: boolean;
+  error: string;
   onNavigate: (screen: WireframeScreenId) => void;
 }
 
@@ -47,6 +54,8 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
   schedules,
   onEditSchedule,
   onCreateNewSchedule,
+  isLoading,
+  error,
   onNavigate,
 }) => {
   const [roomFilter, setRoomFilter] = useState('All Rooms');
@@ -142,7 +151,13 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
           </button>
         </section>
 
-        {schedules.length > 0 ? (
+        {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">{error}</p>}
+
+        {isLoading ? (
+          <section className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
+            Loading schedules...
+          </section>
+        ) : schedules.length > 0 ? (
           <section className="bg-white rounded-xl border border-slate-200/90 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse table-fixed min-w-[820px]">
@@ -228,8 +243,11 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
 
 interface AdminScheduleAddProps {
   editingSchedule: ScheduleEntry | null;
-  onSaveSchedule: (entry: ScheduleEntry) => void;
-  onDeleteSchedule: (id: string) => void;
+  instructors: ScheduleInstructorOption[];
+  labRooms: ScheduleLabRoomOption[];
+  error: string;
+  onSaveSchedule: (entry: ScheduleEntry) => Promise<void>;
+  onDeleteSchedule: (id: string) => Promise<void>;
   onNavigate: (screen: WireframeScreenId) => void;
 }
 
@@ -237,41 +255,64 @@ const ALL_DAYS: ScheduleEntry['day'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sa
 
 export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
   editingSchedule,
+  instructors,
+  labRooms,
+  error,
   onSaveSchedule,
   onDeleteSchedule,
   onNavigate,
 }) => {
-  const [room, setRoom] = useState(editingSchedule?.room || '');
+  const [labRoomId, setLabRoomId] = useState(editingSchedule?.labRoomId || 0);
   const [subject, setSubject] = useState(editingSchedule?.subject || '');
-  const [teacher, setTeacher] = useState(editingSchedule?.teacher || '');
+  const [instructorId, setInstructorId] = useState(editingSchedule?.instructorId || 0);
   const [semester, setSemester] = useState(editingSchedule?.semester || '');
+  const [actionError, setActionError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const [selectedDay, setSelectedDay] = useState<ScheduleEntry['day']>(
     editingSchedule?.day || 'Mon'
   );
   const [startTime, setStartTime] = useState(toInputTime(editingSchedule?.startTime || '02:00 PM'));
   const [endTime, setEndTime] = useState(toInputTime(editingSchedule?.endTime || '04:00 PM'));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
+    setActionError('');
     const newEntry: ScheduleEntry = {
-      id: editingSchedule?.id || `sch-${Date.now()}`,
+      id: editingSchedule?.id || '',
+      instructorId,
+      labRoomId,
       day: selectedDay,
       startTime: toScheduleTime(startTime),
       endTime: toScheduleTime(endTime),
       subject,
-      teacher,
-      room,
-      department: '',
+      teacher: instructors.find((instructor) => instructor.id === instructorId)
+        ? `${instructors.find((instructor) => instructor.id === instructorId)!.firstName} ${instructors.find((instructor) => instructor.id === instructorId)!.lastName}`
+        : '',
+      room: labRooms.find((room) => room.id === labRoomId)?.roomName || '',
+      department: instructors.find((instructor) => instructor.id === instructorId)?.department || '',
       semester,
       colorTheme: editingSchedule?.colorTheme || 'blue',
     };
-    onSaveSchedule(newEntry);
-    onNavigate('admin-schedule-module');
+    try {
+      await onSaveSchedule(newEntry);
+      onNavigate('admin-schedule-module');
+    } catch (saveError) {
+      setActionError(saveError instanceof Error ? saveError.message : 'Unable to save schedule.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (editingSchedule) {
-      onDeleteSchedule(editingSchedule.id);
+      setActionError('');
+      try {
+        await onDeleteSchedule(editingSchedule.id);
+      } catch (deleteError) {
+        setActionError(deleteError instanceof Error ? deleteError.message : 'Unable to delete schedule.');
+        return;
+      }
     }
     onNavigate('admin-schedule-module');
   };
@@ -303,13 +344,15 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
               <label className="block font-semibold text-slate-600 mb-1.5">
                 Laboratory Room
               </label>
-              <input
-                type="text"
-                value={room}
-                onChange={(e) => setRoom(e.target.value)}
+              <select
+                required
+                value={labRoomId || ''}
+                onChange={(event) => setLabRoomId(Number(event.target.value))}
                 className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f]"
-                placeholder="Laboratory room"
-              />
+              >
+                <option value="" disabled>Select a lab room</option>
+                {labRooms.map((room) => <option key={room.id} value={room.id}>{room.roomName}</option>)}
+              </select>
             </div>
 
             <div>
@@ -318,6 +361,7 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
               </label>
               <input
                 type="text"
+                required
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f]"
@@ -329,13 +373,19 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
               <label className="block font-semibold text-slate-600 mb-1.5">
                 Assigned Teacher
               </label>
-              <input
-                type="text"
-                value={teacher}
-                onChange={(e) => setTeacher(e.target.value)}
+              <select
+                required
+                value={instructorId || ''}
+                onChange={(event) => setInstructorId(Number(event.target.value))}
                 className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f]"
-                placeholder="Teacher"
-              />
+              >
+                <option value="" disabled>Select an instructor</option>
+                {instructors.map((instructor) => (
+                  <option key={instructor.id} value={instructor.id}>
+                    {instructor.firstName} {instructor.lastName}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -351,6 +401,10 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
               />
             </div>
           </div>
+
+          {(error || actionError) && (
+            <p role="alert" className="text-xs font-medium text-rose-700">{actionError || error}</p>
+          )}
 
           {/* Day of Week Selector */}
           <div className="text-xs">
@@ -411,7 +465,8 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
           <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
             <button
               type="button"
-              onClick={handleDelete}
+              onClick={() => void handleDelete()}
+              disabled={!editingSchedule || isSaving}
               className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-rose-200 bg-rose-50/50 hover:bg-rose-100/70 text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -428,9 +483,10 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
               </button>
               <button
                 type="submit"
+                disabled={isSaving || !instructors.length || !labRooms.length}
                 className="px-5 py-2.5 rounded-lg bg-[#2563eb] hover:bg-blue-700 text-white text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
               >
-                Save Schedule
+                {isSaving ? 'Saving...' : 'Save Schedule'}
               </button>
             </div>
           </div>

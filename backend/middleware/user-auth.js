@@ -31,7 +31,7 @@ async function authenticate(req, res, next) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, idNumber: true, role: true },
+      select: { id: true, schoolId: true, role: true },
     });
     if (!user) {
       return res.status(401).json({ error: 'Invalid or expired token.' });

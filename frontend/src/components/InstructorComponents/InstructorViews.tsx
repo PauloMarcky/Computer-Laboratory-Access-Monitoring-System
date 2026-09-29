@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { CheckCircle2, UserPlus, Play, Square } from 'lucide-react';
 import { ClamsHeader } from '../ClamsHeader';
-import { AttendanceEntry, WireframeScreenId } from '../../types';
+import { getAttendanceStatus, formatAttendanceTime } from '../../utils/attendance-time';
+import type { AttendanceEntry, ScheduleEntry, WireframeScreenId } from '../../types';
 
 interface InstructorAttendanceProps {
   attendance: AttendanceEntry[];
+  schedule: ScheduleEntry | null;
   onScanStudent: (entry: AttendanceEntry) => void;
   onNavigate: (screen: WireframeScreenId) => void;
   sessionUnlocked: boolean;
@@ -16,6 +18,7 @@ interface InstructorAttendanceProps {
 
 export const InstructorAttendanceView: React.FC<InstructorAttendanceProps> = ({
   attendance,
+  schedule,
   onScanStudent,
   onNavigate,
   sessionUnlocked,
@@ -31,14 +34,17 @@ export const InstructorAttendanceView: React.FC<InstructorAttendanceProps> = ({
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customId.trim() || !customName.trim()) return;
+    const now = new Date();
     const newEntry: AttendanceEntry = {
       id: `att-${Date.now()}`,
-      timeIn: '08:24 AM',
+      timeIn: formatAttendanceTime(now),
       studentId: customId.trim(),
       name: customName.trim(),
       formalName: customName.trim(),
       pcNumber: 'None',
-      status: 'Late',
+      status: schedule
+        ? getAttendanceStatus(now, schedule.startTime, schedule.endTime)
+        : 'On-Time',
     };
     onScanStudent(newEntry);
     onStudentLogged(`${newEntry.name} (${newEntry.studentId}) logged with no PC assigned`);

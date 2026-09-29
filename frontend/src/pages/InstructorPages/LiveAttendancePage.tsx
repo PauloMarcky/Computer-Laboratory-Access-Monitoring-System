@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { CameraScanner, type MatchedStudent } from '../../components/InstructorComponents/CameraScanner';
 import { InstructorAttendanceView } from '../../components/InstructorComponents/InstructorViews';
-import type { AttendanceEntry, WireframeScreenId } from '../../types';
+import { getAttendanceStatus, formatAttendanceTime } from '../../utils/attendance-time';
+import type { AttendanceEntry, ScheduleEntry, WireframeScreenId } from '../../types';
 
 interface LiveAttendancePageProps {
   attendance: AttendanceEntry[];
+  schedule: ScheduleEntry | null;
   onScanStudent: (entry: AttendanceEntry) => void;
   onNavigate: (screen: WireframeScreenId) => void;
 }
 
 export const LiveAttendancePage = ({
   attendance,
+  schedule,
   onScanStudent,
   onNavigate,
 }: LiveAttendancePageProps) => {
@@ -27,24 +30,28 @@ export const LiveAttendancePage = ({
     }
     if (!sessionUnlocked) return { result: 'duplicate' };
 
+    const now = new Date();
     const newEntry: AttendanceEntry = {
       id: `att-${Date.now()}`,
-      timeIn: student.timeIn,
+      timeIn: formatAttendanceTime(now),
       studentId: student.studentId,
       name: student.studentName,
       formalName: student.formalName || student.studentName,
       pcNumber: 'None',
-      status: 'On-Time',
+      status: schedule
+        ? getAttendanceStatus(now, schedule.startTime, schedule.endTime)
+        : 'On-Time',
     };
 
     onScanStudent(newEntry);
     setLastScannedName(`${student.studentName} (${student.studentId}) logged with no PC assigned`);
-    return { result: 'added', timeIn: student.timeIn };
+    return { result: 'added', timeIn: newEntry.timeIn };
   };
 
   return (
     <InstructorAttendanceView
       attendance={attendance}
+      schedule={schedule}
       onScanStudent={onScanStudent}
       onNavigate={onNavigate}
       sessionUnlocked={sessionUnlocked}

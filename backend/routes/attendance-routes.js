@@ -72,7 +72,7 @@ function errorMessage(err) {
   return err.code === 'ENOENT' ? `students.csv not found at ${CSV_PATH}` : err.message || 'Server error';
 }
 
-// POST /api/v1/attendance/scan-image
+// POST /api/attendance/scan-image
 // Body: raw JPEG (Content-Type: image/jpeg). Runs OCR, then looks the ID up in students.csv.
 router.post(
   '/scan-image',

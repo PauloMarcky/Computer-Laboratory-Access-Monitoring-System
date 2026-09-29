@@ -17,7 +17,18 @@ export type WireframeScreenId =
   | 'admin-schedule-add-module'
   | 'admin-teacher-workload'
   | 'admin-reports-dashboard'
-  | 'admin-students-analytics';
+  | 'admin-students-analytics'
+  | 'admin-user-management';
+
+export type UserRole = 'ADMIN' | 'STUDENT' | 'INSTRUCTOR' | 'CUSTODIAN';
+export type ManagedUserRole = Exclude<UserRole, 'ADMIN'>;
+
+export interface ManagedUser {
+  id: number;
+  fullName: string | null;
+  schoolId: string;
+  role: UserRole;
+}
 
 export interface AttendanceEntry {
   id: string;
@@ -49,6 +60,8 @@ export interface PCIssueReport {
   description: string;
   submittedAt: string;
   status: 'Open' | 'Resolved';
+  custodianReport?: string;
+  resolvedAt?: string;
 }
 
 export interface LabUsageRecord {
@@ -81,6 +94,8 @@ export interface LabRoomStatus {
 
 export interface ScheduleEntry {
   id: string;
+  instructorId: number;
+  labRoomId: number;
   day: 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat';
   startTime: string;
   endTime: string;
@@ -90,6 +105,18 @@ export interface ScheduleEntry {
   department: string;
   semester: string;
   colorTheme: 'blue' | 'green' | 'amber' | 'purple';
+}
+
+export interface ScheduleInstructorOption {
+  id: number;
+  firstName: string;
+  lastName: string;
+  department: string | null;
+}
+
+export interface ScheduleLabRoomOption {
+  id: number;
+  roomName: string;
 }
 
 export interface TeacherWorkload {

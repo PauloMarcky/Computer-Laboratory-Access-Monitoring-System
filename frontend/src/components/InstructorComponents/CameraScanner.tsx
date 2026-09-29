@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Camera, CameraOff, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { API_BASE_URL } from '../../api';
 
 // One endpoint: Express runs OCR (Python worker) and looks the student up in students.csv
-const SCAN_IMAGE_URL = 'http://localhost:3000/api/v1/attendance/scan-image';
+const SCAN_IMAGE_URL = `${API_BASE_URL}/attendance/scan-image`;
 const SCAN_INTERVAL_MS = 700;
 const COOLDOWN_MS = 4000; // don't re-scan the same ID immediately
 const FEEDBACK_MS = 2800; // how long the result overlay stays on screen
@@ -211,7 +212,7 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, onMatched })
             detail:
               serverMsg ||
               (apiRes.status === 404
-                ? 'Route /api/v1/attendance/scan-image not found. Update server.js and attendance-routes.js.'
+                ? 'Route /api/attendance/scan-image not found. Check that the backend is running.'
                 : 'Could not process the scan'),
           });
           return;
@@ -288,22 +289,22 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, onMatched })
         />
         <div
           className={`absolute border-2 rounded pointer-events-none transition-colors ${feedback?.type === 'success'
-              ? 'border-emerald-400'
-              : feedback?.type === 'duplicate'
-                ? 'border-amber-400'
-                : feedback
-                  ? 'border-rose-400'
-                  : 'border-white/70'
+            ? 'border-emerald-400'
+            : feedback?.type === 'duplicate'
+              ? 'border-amber-400'
+              : feedback
+                ? 'border-rose-400'
+                : 'border-white/70'
             }`}
           style={{ left: '10%', right: '10%', top: '20%', bottom: '20%' }}
         />
         {feedback && (
           <div
             className={`absolute inset-x-0 bottom-0 px-4 py-3 flex items-center gap-3 text-white ${feedback.type === 'success'
-                ? 'bg-emerald-600/95'
-                : feedback.type === 'duplicate'
-                  ? 'bg-amber-500/95'
-                  : 'bg-rose-600/95'
+              ? 'bg-emerald-600/95'
+              : feedback.type === 'duplicate'
+                ? 'bg-amber-500/95'
+                : 'bg-rose-600/95'
               }`}
           >
             {feedback.type === 'success' ? (

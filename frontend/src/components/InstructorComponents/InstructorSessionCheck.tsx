@@ -5,10 +5,9 @@ import type { ScheduleEntry, WireframeScreenId } from '../../types';
 
 interface InstructorSessionCheckProps {
   schedules: ScheduleEntry[];
+  onStartAttendance: (schedule: ScheduleEntry) => void;
   onNavigate: (screen: WireframeScreenId) => void;
 }
-
-const DAYS: ScheduleEntry['day'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const toMinutes = (time: string) => {
   const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -19,13 +18,15 @@ const toMinutes = (time: string) => {
   return hour * 60 + Number(minuteText);
 };
 
-export const InstructorSessionCheck = ({ schedules, onNavigate }: InstructorSessionCheckProps) => {
-  const [instructor, setInstructor] = useState('');
-  const [subject, setSubject] = useState('');
-  const [day, setDay] = useState<ScheduleEntry['day']>('Mon');
-  const [time, setTime] = useState('');
+export const InstructorSessionCheck = ({ schedules, onStartAttendance, onNavigate }: InstructorSessionCheckProps) => {
+  const [selectedScheduleId, setSelectedScheduleId] = useState('');
   const [matchedSchedule, setMatchedSchedule] = useState<ScheduleEntry | null>(null);
   const [hasChecked, setHasChecked] = useState(false);
+  const selectedSchedule = schedules.find((schedule) => schedule.id === selectedScheduleId) || null;
+  const currentTimeLabel = new Date().toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
   const clearResult = () => {
     setMatchedSchedule(null);
@@ -34,21 +35,20 @@ export const InstructorSessionCheck = ({ schedules, onNavigate }: InstructorSess
 
   const handleCheck = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const enteredMinutes = time ? Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5)) : -1;
-    const match = schedules.find((schedule) => {
-      const start = toMinutes(schedule.startTime);
-      const end = toMinutes(schedule.endTime);
-      return (
-        schedule.teacher.trim().toLowerCase() === instructor.trim().toLowerCase() &&
-        schedule.subject.trim().toLowerCase() === subject.trim().toLowerCase() &&
-        schedule.day === day &&
-        start !== null &&
-        end !== null &&
-        enteredMinutes >= start &&
-        enteredMinutes < end
-      );
-    });
-    setMatchedSchedule(match ?? null);
+    const now = new Date();
+    const today = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()];
+    const currentMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+    const start = selectedSchedule ? toMinutes(selectedSchedule.startTime) : null;
+    const end = selectedSchedule ? toMinutes(selectedSchedule.endTime) : null;
+    const isScheduledNow = Boolean(
+      selectedSchedule &&
+      selectedSchedule.day === today &&
+      start !== null &&
+      end !== null &&
+      currentMinutes >= start &&
+      currentMinutes < end
+    );
+    setMatchedSchedule(isScheduledNow ? selectedSchedule : null);
     setHasChecked(true);
   };
 
@@ -69,49 +69,26 @@ export const InstructorSessionCheck = ({ schedules, onNavigate }: InstructorSess
             </div>
 
             <label className="block text-sm font-medium text-slate-700">
-              Instructor name
-              <input
+              Scheduled class
+              <select
                 required
-                value={instructor}
-                onChange={(event) => { setInstructor(event.target.value); clearResult(); }}
-                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#1b325f] focus:ring-2 focus:ring-[#1b325f]/15"
-                placeholder="Name as listed in the schedule"
-              />
+                value={selectedScheduleId}
+                onChange={(event) => {
+                  setSelectedScheduleId(event.target.value);
+                  clearResult();
+                }}
+                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#1b325f] focus:ring-2 focus:ring-[#1b325f]/15"
+              >
+                <option value="" disabled>Select a class from your schedule</option>
+                {schedules.map((schedule) => (
+                  <option key={schedule.id} value={schedule.id}>
+                    {schedule.subject} · {schedule.day}, {schedule.startTime}–{schedule.endTime} · {schedule.room}
+                  </option>
+                ))}
+              </select>
             </label>
 
-            <label className="block text-sm font-medium text-slate-700">
-              Subject
-              <input
-                required
-                value={subject}
-                onChange={(event) => { setSubject(event.target.value); clearResult(); }}
-                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#1b325f] focus:ring-2 focus:ring-[#1b325f]/15"
-                placeholder="Enter subject name"
-              />
-            </label>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="block text-sm font-medium text-slate-700">
-                Class day
-                <select
-                  value={day}
-                  onChange={(event) => { setDay(event.target.value as ScheduleEntry['day']); clearResult(); }}
-                  className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#1b325f] focus:ring-2 focus:ring-[#1b325f]/15"
-                >
-                  {DAYS.map((weekday) => <option key={weekday} value={weekday}>{weekday}</option>)}
-                </select>
-              </label>
-              <label className="block text-sm font-medium text-slate-700">
-                Current class time
-                <input
-                  required
-                  type="time"
-                  value={time}
-                  onChange={(event) => { setTime(event.target.value); clearResult(); }}
-                  className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#1b325f] focus:ring-2 focus:ring-[#1b325f]/15"
-                />
-              </label>
-            </div>
+            <p className="text-xs text-slate-500">Current computer time: {currentTimeLabel}</p>
 
             <button
               type="submit"
@@ -144,7 +121,7 @@ export const InstructorSessionCheck = ({ schedules, onNavigate }: InstructorSess
                 </dl>
                 <button
                   type="button"
-                  onClick={() => onNavigate('instructor-attendance-module')}
+                  onClick={() => onStartAttendance(matchedSchedule)}
                   className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-800"
                 >
                   Open attendance <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -158,7 +135,7 @@ export const InstructorSessionCheck = ({ schedules, onNavigate }: InstructorSess
                 <p>
                   {schedules.length === 0
                     ? 'No schedules are configured yet. Ask an administrator to add your class schedule first.'
-                    : 'No class schedule matches those details at the selected time. Check your entries or contact an administrator.'}
+                    : 'That class is not scheduled for the current day and time. Attendance opens during its scheduled time.'}
                 </p>
               </div>
             )}

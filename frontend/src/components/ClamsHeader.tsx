@@ -1,6 +1,6 @@
 import React from 'react';
 import { LogOut } from 'lucide-react';
-import { UniversitySeal } from './UniversitySeal';
+import universityLogo from '../assets/images/uls-cit-logo.png';
 import { WireframeScreenId } from '../types';
 
 interface ClamsHeaderProps {
@@ -33,7 +33,11 @@ export const ClamsHeader: React.FC<ClamsHeaderProps> = ({
           className="flex items-center gap-3 text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded-lg"
           title="Log out and return to Access Level Portal"
         >
-          <UniversitySeal size="sm" />
+          <img
+            src={universityLogo}
+            alt="University of La Salette logo"
+            className="h-10 w-auto max-w-40 object-contain shrink-0"
+          />
           <div>
             <div className="text-base font-bold tracking-tight text-white leading-tight group-hover:text-amber-200 transition-colors">
               CLAMS

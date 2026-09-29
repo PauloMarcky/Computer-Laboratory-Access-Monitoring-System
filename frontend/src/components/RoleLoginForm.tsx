@@ -1,5 +1,5 @@
+import { useState, type FormEvent } from 'react';
 import { ArrowLeft, LogIn } from 'lucide-react';
-import type { FormEvent } from 'react';
 import type { WireframeScreenId } from '../types';
 
 interface RoleLoginFormProps {
@@ -12,6 +12,7 @@ interface RoleLoginFormProps {
   destination: WireframeScreenId;
   accent: string;
   onIdentitySubmit?: (identity: string) => void;
+  onCredentialsSubmit?: (identity: string, password: string) => Promise<void>;
 }
 
 interface RoleLoginProps {
@@ -28,11 +29,32 @@ export const RoleLoginForm = ({
   destination,
   accent,
   onIdentitySubmit,
+  onCredentialsSubmit,
 }: RoleLoginFormProps) => {
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const identity = new FormData(event.currentTarget).get('username');
-    if (onIdentitySubmit && typeof identity === 'string') {
+    const formData = new FormData(event.currentTarget);
+    const identity = formData.get('username');
+    const password = formData.get('password');
+    if (typeof identity !== 'string' || typeof password !== 'string') return;
+
+    if (onCredentialsSubmit) {
+      setSubmitError('');
+      setIsSubmitting(true);
+      try {
+        await onCredentialsSubmit(identity.trim(), password);
+      } catch (error) {
+        setSubmitError(error instanceof Error ? error.message : 'Unable to sign in.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    if (onIdentitySubmit) {
       onIdentitySubmit(identity.trim());
       return;
     }
@@ -80,12 +102,15 @@ export const RoleLoginForm = ({
             />
           </label>
 
+          {submitError && <p role="alert" className="text-sm text-rose-700">{submitError}</p>}
+
           <button
             type="submit"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1d3663]"
+            disabled={isSubmitting}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1d3663] disabled:cursor-wait disabled:opacity-70"
           >
             <LogIn size={16} aria-hidden="true" />
-            Continue
+            {isSubmitting ? 'Signing in...' : 'Continue'}
           </button>
         </form>
       </section>

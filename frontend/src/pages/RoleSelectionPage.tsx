@@ -44,20 +44,20 @@ export const RoleSelectionPage = ({
 
             <button
               type="button"
-              onClick={() => onNavigate('lab-staff-login')}
-              /* All buttons share this class */
-              className="w-full rounded-lg bg-indigo-900 px-4 py-3.5 text-sm font-semibold text-white transition-all hover:bg-slate-800 hover:shadow-md"
-            >
-              Laboratory Staff
-            </button>
-
-            <button
-              type="button"
               onClick={() => onNavigate('student-login')}
               /* All buttons share this class */
               className="w-full rounded-lg bg-indigo-900 px-4 py-3.5 text-sm font-semibold text-white transition-all hover:bg-slate-800 hover:shadow-md"
             >
               Student Seat Claim
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigate('lab-staff-login')}
+              /* All buttons share this class */
+              className="w-full rounded-lg bg-indigo-900 px-4 py-3.5 text-sm font-semibold text-white transition-all hover:bg-slate-800 hover:shadow-md"
+            >
+              Custodian Portal
             </button>
 
             <button

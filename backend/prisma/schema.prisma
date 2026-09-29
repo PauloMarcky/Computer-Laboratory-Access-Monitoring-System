@@ -16,7 +16,7 @@ enum Role {
 
 model User {
   id        Int      @id @default(autoincrement()) @map("user_id")
-  schoolId  String   @unique @map("id_number")
+  schoolId  String   @unique @map("school_id")
   password  String
   role      Role     @default(STUDENT)
   createdAt DateTime @default(now()) @map("created_at")
@@ -31,7 +31,7 @@ model User {
 
 model StudentProfile {
   id        Int      @id @default(autoincrement()) @map("student_profile_id")
-  studentId Int      @unique @map("schoolId") // Foreign key to User.id
+  studentId Int      @unique @map("student_id") // Foreign key to User.id
   firstName String   @map("first_name")
   lastName  String   @map("last_name")
   course    String?
@@ -84,6 +84,7 @@ model Schedule {
   dayOfWeek    String   @map("day_of_week")
   startTime    DateTime @map("start_time")
   endTime      DateTime @map("end_time")
+  semester     String?  @map("semester")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

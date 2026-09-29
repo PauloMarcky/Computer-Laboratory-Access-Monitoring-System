@@ -60,6 +60,17 @@ export const AdminSubNav: React.FC<AdminSubNavProps> = ({ activeScreen, onNaviga
           >
             Analytics Report
           </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate('admin-user-management')}
+            className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${activeScreen === 'admin-user-management'
+              ? 'border-[#1b325f] text-[#1b325f]'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+          >
+            User Management
+          </button>
         </nav>
 
 

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Layers, ChevronRight } from 'lucide-react';
 import {
   AttendanceEntry,
@@ -11,27 +11,92 @@ import {
   PCIssueReport,
   PCStation,
   ScheduleEntry,
+  ScheduleInstructorOption,
+  ScheduleLabRoomOption,
   WireframeScreenId,
 } from './types';
+import { API_BASE_URL, readApiResponse } from './api';
 import { RoleSelectionPage } from './pages/RoleSelectionPage';
 import { AdminLogin } from './components/AdminComponents/AdminLogin';
 import { InstructorLogin } from './components/InstructorComponents/InstructorLogin';
-import { LabStaffLogin } from './components/LabStaffLogin';
-import { StudentLogin } from './components/StudentLogin';
+import { LabStaffLogin } from './components/CustodianComponents/LabStaffLogin';
+import { StudentLogin } from './components/StudentComponents/StudentLogin';
 import { LiveAttendancePage } from './pages/InstructorPages/LiveAttendancePage';
 import { InstructorSessionVerificationPage } from './pages/InstructorPages/InstructorSessionVerificationPage';
 import { ExportAttendancePage } from './pages/InstructorPages/ExportAttendancePage';
-import { StudentClaimPCView, StudentReportIssueView } from './components/StudentViews';
-import {
-  LabStaffRecordsView,
-  LabStaffReportDetailView,
-  LabStaffReportExportView,
-  LabStaffRoomsView,
-} from './components/LabStaffViews';
+import { StudentClaimPCView } from './pages/StudentPages/PCAssignment';
+import { StudentReportIssueView } from './pages/StudentPages/PCFeedbackReport';
+import { LabStaffReportDetailView } from './pages/CustodianPages.tsx/ComputerReport';
+import { LabStaffReportExportView } from './pages/CustodianPages.tsx/ExportReport';
+import { LabStaffRecordsView, LabStaffRoomsView } from './pages/CustodianPages.tsx/LaboratoriesActivity';
 import { AdminScheduleAddView, AdminScheduleModuleView } from './pages/AdminPages/ScheduleManager';
 import { AdminTeacherWorkloadView } from './pages/AdminPages/InstructorWorkload';
 import { AdminReportsDashboardView } from './pages/AdminPages/ClassReports';
 import { AdminStudentsAnalyticsView } from './pages/AdminPages/AnalyticsReport';
+import { UserManagement } from './pages/AdminPages/UserManagement';
+
+interface ApiSchedule {
+  id: number;
+  instructorId: number;
+  labRoomId: number;
+  subjectCode: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  semester: string | null;
+  instructor: ScheduleInstructorOption;
+  labRoom: ScheduleLabRoomOption;
+}
+
+const apiDayToShort: Record<string, ScheduleEntry['day']> = {
+  MONDAY: 'Mon',
+  TUESDAY: 'Tue',
+  WEDNESDAY: 'Wed',
+  THURSDAY: 'Thu',
+  FRIDAY: 'Fri',
+  SATURDAY: 'Sat',
+  SUNDAY: 'Sat',
+};
+
+const shortDayToApi: Record<ScheduleEntry['day'], string> = {
+  Mon: 'MONDAY',
+  Tue: 'TUESDAY',
+  Wed: 'WEDNESDAY',
+  Thu: 'THURSDAY',
+  Fri: 'FRIDAY',
+  Sat: 'SATURDAY',
+};
+
+const apiTimeToDisplay = (value: string) => {
+  const date = new Date(value);
+  const hour = date.getUTCHours();
+  const minute = String(date.getUTCMinutes()).padStart(2, '0');
+  const period = hour >= 12 ? 'PM' : 'AM';
+  return `${String(hour % 12 || 12).padStart(2, '0')}:${minute} ${period}`;
+};
+
+const displayTimeToApi = (value: string) => {
+  const match = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) throw new Error('Enter a valid start and end time.');
+  let hour = Number(match[1]) % 12;
+  if (match[3].toUpperCase() === 'PM') hour += 12;
+  return `${String(hour).padStart(2, '0')}:${match[2]}`;
+};
+
+const mapApiSchedule = (schedule: ApiSchedule): ScheduleEntry => ({
+  id: String(schedule.id),
+  instructorId: schedule.instructorId,
+  labRoomId: schedule.labRoomId,
+  day: apiDayToShort[schedule.dayOfWeek] || 'Mon',
+  startTime: apiTimeToDisplay(schedule.startTime),
+  endTime: apiTimeToDisplay(schedule.endTime),
+  subject: schedule.subjectCode,
+  teacher: `${schedule.instructor.firstName} ${schedule.instructor.lastName}`,
+  room: schedule.labRoom.roomName,
+  department: schedule.instructor.department || '',
+  semester: schedule.semester || '',
+  colorTheme: 'blue',
+});
 
 const addTwoHours = (time: string) => {
   const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -114,6 +179,7 @@ const WIREFRAME_SCREENS: Array<{
       label: '14. admin-students-analytics',
       roleGroup: 'Admin',
     },
+    { id: 'admin-user-management', label: 'Admin user management', roleGroup: 'Admin' },
   ];
 
 export default function App() {
@@ -135,7 +201,122 @@ export default function App() {
 
   // Admin Schedule State
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
+  const [activeInstructorSchedule, setActiveInstructorSchedule] = useState<ScheduleEntry | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleEntry | null>(null);
+  const [adminToken, setAdminToken] = useState('');
+  const [scheduleInstructors, setScheduleInstructors] = useState<ScheduleInstructorOption[]>([]);
+  const [scheduleLabRooms, setScheduleLabRooms] = useState<ScheduleLabRoomOption[]>([]);
+  const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
+  const [scheduleError, setScheduleError] = useState('');
+
+  useEffect(() => {
+    if (currentScreen === 'login-portal') setAdminToken('');
+  }, [currentScreen]);
+
+  useEffect(() => {
+    if (!adminToken) return;
+    let active = true;
+
+    const loadScheduleData = async () => {
+      setIsLoadingSchedules(true);
+      setScheduleError('');
+      try {
+        const headers = { Authorization: `Bearer ${adminToken}` };
+        const [scheduleResponse, instructorResponse, roomResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/schedules`, { headers }),
+          fetch(`${API_BASE_URL}/instructors`, { headers }),
+          fetch(`${API_BASE_URL}/lab-rooms`, { headers }),
+        ]);
+        const [scheduleResult, instructorResult, roomResult] = await Promise.all([
+          readApiResponse<{ error?: string; schedules: ApiSchedule[] }>(scheduleResponse),
+          readApiResponse<{ error?: string; instructors: ScheduleInstructorOption[] }>(instructorResponse),
+          readApiResponse<{ error?: string; labRooms: ScheduleLabRoomOption[] }>(roomResponse),
+        ]);
+        for (const [response, result] of [
+          [scheduleResponse, scheduleResult],
+          [instructorResponse, instructorResult],
+          [roomResponse, roomResult],
+        ] as const) {
+          if (!response.ok) throw new Error(result.error || 'Unable to load schedule data.');
+        }
+        if (!active) return;
+        setSchedules(scheduleResult.schedules.map(mapApiSchedule));
+        setScheduleInstructors(instructorResult.instructors);
+        setScheduleLabRooms(roomResult.labRooms);
+      } catch (error) {
+        if (active) setScheduleError(error instanceof Error ? error.message : 'Unable to load schedule data.');
+      } finally {
+        if (active) setIsLoadingSchedules(false);
+      }
+    };
+
+    void loadScheduleData();
+    return () => { active = false; };
+  }, [adminToken]);
+
+  const handleAdminLogin = async (schoolId: string, password: string) => {
+    await handleRoleLogin('ADMIN', schoolId, password);
+  };
+
+  const handleRoleLogin = async (
+    expectedRole: 'ADMIN' | 'INSTRUCTOR' | 'CUSTODIAN' | 'STUDENT',
+    schoolId: string,
+    password: string
+  ) => {
+    const response = await fetch(`${API_BASE_URL}/users/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schoolId, password }),
+    });
+    const result = await readApiResponse<{
+      error?: string;
+      token?: string;
+      user?: { role?: string };
+    }>(response);
+    if (!response.ok) throw new Error(result.error || 'Unable to sign in.');
+    if (result.user?.role !== expectedRole || typeof result.token !== 'string') {
+      throw new Error(`These credentials are not for the ${expectedRole.toLowerCase()} portal.`);
+    }
+
+    if (expectedRole === 'INSTRUCTOR') {
+      const scheduleResponse = await fetch(`${API_BASE_URL}/schedules`, {
+        headers: { Authorization: `Bearer ${result.token}` },
+      });
+      const scheduleResult = await readApiResponse<{ error?: string; schedules: ApiSchedule[] }>(scheduleResponse);
+      if (!scheduleResponse.ok) throw new Error(scheduleResult.error || 'Unable to load your class schedule.');
+      setSchedules(scheduleResult.schedules.map(mapApiSchedule));
+    }
+
+    setAdminToken(expectedRole === 'ADMIN' ? result.token : '');
+    setActiveInstructorSchedule(null);
+    if (expectedRole === 'STUDENT') {
+      setCurrentStudentId(schoolId);
+      setSelectedPc('');
+      setIsClaimedConfirmed(false);
+    }
+
+    const roleHome: Record<typeof expectedRole, WireframeScreenId> = {
+      ADMIN: 'admin-schedule-module',
+      INSTRUCTOR: 'instructor-session-verification',
+      CUSTODIAN: 'lab-staff-report-detail',
+      STUDENT: 'student-claim-pc',
+    };
+    setCurrentScreen(roleHome[expectedRole]);
+  };
+
+  const handleInstructorLogin = (schoolId: string, password: string) =>
+    handleRoleLogin('INSTRUCTOR', schoolId, password);
+
+  const handleCustodianLogin = (schoolId: string, password: string) =>
+    handleRoleLogin('CUSTODIAN', schoolId, password);
+
+  const handleStudentLogin = (schoolId: string, password: string) =>
+    handleRoleLogin('STUDENT', schoolId, password);
+
+  const handleStartInstructorAttendance = (schedule: ScheduleEntry) => {
+    setActiveInstructorSchedule(schedule);
+    setCurrentScreen('instructor-attendance-module');
+  };
 
   const handleScanStudent = (newEntry: AttendanceEntry) => {
     const entryWithClaimedPc =
@@ -193,13 +374,6 @@ export default function App() {
     }
   };
 
-  const handleStudentLogin = (studentId: string) => {
-    setCurrentStudentId(studentId);
-    setSelectedPc('');
-    setIsClaimedConfirmed(false);
-    setCurrentScreen('student-claim-pc');
-  };
-
   const handleSubmitPcIssue = (
     category: PCIssueReport['category'],
     description: string
@@ -208,13 +382,31 @@ export default function App() {
       id: `iss-${Date.now()}`,
       pcNumber: `PC-${selectedPc}`,
       labRoom: '',
-      studentId: '',
+      studentId: currentStudentId,
       category,
       description,
       submittedAt: 'Just now',
       status: 'Open',
     };
     setPcIssueReports((prev) => [newIssue, ...prev]);
+  };
+
+  const handleMarkPcIssueFixed = (reportId: string) => {
+    setPcIssueReports((prev) =>
+      prev.map((report) =>
+        report.id === reportId
+          ? { ...report, status: 'Resolved', resolvedAt: new Date().toLocaleString() }
+          : report
+      )
+    );
+  };
+
+  const handleSavePcIssueReport = (reportId: string, custodianReport: string) => {
+    setPcIssueReports((prev) =>
+      prev.map((report) =>
+        report.id === reportId ? { ...report, custodianReport } : report
+      )
+    );
   };
 
   const handleUpdateReportStatus = (
@@ -237,7 +429,9 @@ export default function App() {
     startTime = '02:00 PM'
   ) => {
     setEditingSchedule({
-      id: `sch-${Date.now()}`,
+      id: '',
+      instructorId: 0,
+      labRoomId: 0,
       day,
       startTime,
       endTime: addTwoHours(startTime),
@@ -251,22 +445,49 @@ export default function App() {
     setCurrentScreen('admin-schedule-add-module');
   };
 
-  const handleSaveSchedule = (entry: ScheduleEntry) => {
-    setSchedules((prev) => {
-      const exists = prev.some((s) => s.id === entry.id);
-      if (exists) {
-        return prev.map((s) => (s.id === entry.id ? entry : s));
+  const handleSaveSchedule = async (entry: ScheduleEntry) => {
+    const isUpdate = /^\d+$/.test(entry.id) && Number(entry.id) > 0;
+    const dayOfWeek = shortDayToApi[entry.day];
+    const response = await fetch(
+      isUpdate ? `${API_BASE_URL}/schedules/${entry.id}` : `${API_BASE_URL}/schedules`,
+      {
+        method: isUpdate ? 'PATCH' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({
+          instructorId: entry.instructorId,
+          labRoomId: entry.labRoomId,
+          subjectCode: entry.subject.trim(),
+          dayOfWeek,
+          startTime: displayTimeToApi(entry.startTime),
+          endTime: displayTimeToApi(entry.endTime),
+          semester: entry.semester,
+        }),
       }
-      // Replace any existing slot on same day + startTime or append
-      const withoutConflict = prev.filter(
-        (s) => !(s.day === entry.day && s.startTime === entry.startTime)
-      );
-      return [...withoutConflict, entry];
-    });
+    );
+    const result = await readApiResponse<{ error?: string; schedule: ApiSchedule }>(response);
+    if (!response.ok) throw new Error(result.error || 'Unable to save schedule.');
+    const savedSchedule = mapApiSchedule(result.schedule);
+    setSchedules((current) => isUpdate
+      ? current.map((schedule) => schedule.id === savedSchedule.id ? savedSchedule : schedule)
+      : [...current, savedSchedule]
+    );
+    setScheduleError('');
   };
 
-  const handleDeleteSchedule = (id: string) => {
+  const handleDeleteSchedule = async (id: string) => {
+    const response = await fetch(`${API_BASE_URL}/schedules/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    if (!response.ok) {
+      const result = await readApiResponse<{ error?: string }>(response);
+      throw new Error(result.error || 'Unable to delete schedule.');
+    }
     setSchedules((prev) => prev.filter((s) => s.id !== id));
+    setScheduleError('');
   };
 
   const activeReport = classReports.find((r) => r.id === selectedReportId);
@@ -284,18 +505,19 @@ export default function App() {
         )}
 
         {currentScreen === 'instructor-login' && (
-          <InstructorLogin onNavigate={setCurrentScreen} />
+          <InstructorLogin onNavigate={setCurrentScreen} onInstructorLogin={handleInstructorLogin} />
         )}
 
         {currentScreen === 'instructor-session-verification' && (
           <InstructorSessionVerificationPage
             schedules={schedules}
+            onStartAttendance={handleStartInstructorAttendance}
             onNavigate={setCurrentScreen}
           />
         )}
 
         {currentScreen === 'lab-staff-login' && (
-          <LabStaffLogin onNavigate={setCurrentScreen} />
+          <LabStaffLogin onNavigate={setCurrentScreen} onCustodianLogin={handleCustodianLogin} />
         )}
 
         {currentScreen === 'student-login' && (
@@ -303,12 +525,13 @@ export default function App() {
         )}
 
         {currentScreen === 'admin-login' && (
-          <AdminLogin onNavigate={setCurrentScreen} />
+          <AdminLogin onNavigate={setCurrentScreen} onAdminLogin={handleAdminLogin} />
         )}
 
         {currentScreen === 'instructor-attendance-module' && (
           <LiveAttendancePage
             attendance={attendance}
+            schedule={activeInstructorSchedule}
             onScanStudent={handleScanStudent}
             onNavigate={setCurrentScreen}
           />
@@ -332,7 +555,7 @@ export default function App() {
         {currentScreen === 'student-report-issue' && (
           <StudentReportIssueView
             selectedPc={selectedPc}
-            reports={pcIssueReports}
+            reports={pcIssueReports.filter((report) => report.studentId === currentStudentId)}
             onSubmitIssue={handleSubmitPcIssue}
             onNavigate={setCurrentScreen}
           />
@@ -342,13 +565,16 @@ export default function App() {
           <LabStaffReportDetailView
             selectedReport={activeReport}
             onUpdateReportStatus={handleUpdateReportStatus}
+            pcIssueReports={pcIssueReports}
+            onMarkPcIssueFixed={handleMarkPcIssueFixed}
             onNavigate={setCurrentScreen}
           />
         )}
 
         {currentScreen === 'lab-staff-report-export' && (
           <LabStaffReportExportView
-            attendance={activeReport?.attendanceList || attendance}
+            reports={pcIssueReports}
+            onSaveCustodianReport={handleSavePcIssueReport}
             onNavigate={setCurrentScreen}
           />
         )}
@@ -372,6 +598,8 @@ export default function App() {
             schedules={schedules}
             onEditSchedule={handleEditSchedule}
             onCreateNewSchedule={handleCreateNewSchedule}
+            isLoading={isLoadingSchedules}
+            error={scheduleError}
             onNavigate={setCurrentScreen}
           />
         )}
@@ -379,6 +607,9 @@ export default function App() {
         {currentScreen === 'admin-schedule-add-module' && (
           <AdminScheduleAddView
             editingSchedule={editingSchedule}
+            instructors={scheduleInstructors}
+            labRooms={scheduleLabRooms}
+            error={scheduleError}
             onSaveSchedule={handleSaveSchedule}
             onDeleteSchedule={handleDeleteSchedule}
             onNavigate={setCurrentScreen}
@@ -402,6 +633,13 @@ export default function App() {
 
         {currentScreen === 'admin-students-analytics' && (
           <AdminStudentsAnalyticsView onNavigate={setCurrentScreen} />
+        )}
+
+        {currentScreen === 'admin-user-management' && (
+          <UserManagement
+            adminToken={adminToken}
+            onNavigate={setCurrentScreen}
+          />
         )}
       </div>
     </div>
