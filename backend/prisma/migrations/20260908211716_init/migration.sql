@@ -74,6 +74,8 @@ CREATE TABLE `schedules` (
     `instructor_id` INTEGER NOT NULL,
     `lab_room_id` INTEGER NOT NULL,
     `subject_code` VARCHAR(191) NOT NULL,
+    `section` VARCHAR(10) NOT NULL DEFAULT 'A',           -- NEW
+    `year_level` INTEGER NOT NULL DEFAULT 1,               -- NEW
     `day_of_week` VARCHAR(191) NOT NULL,
     `start_time` DATETIME(3) NOT NULL,
     `end_time` DATETIME(3) NOT NULL,

@@ -77,19 +77,23 @@ model LabRoom {
 }
 
 model Schedule {
-  id           Int      @id @default(autoincrement()) @map("schedule_id")
-  instructorId Int      @map("instructor_id") // Foreign key referencing InstructorProfile.id
+  scheduleId   Int      @id @default(autoincrement()) @map("schedule_id")
+  termId       Int?     @map("term_id")
+  instructorId Int      @map("instructor_id")
   labRoomId    Int      @map("lab_room_id")
-  subjectCode  String   @map("subject_code")
-  dayOfWeek    String   @map("day_of_week")
-  startTime    DateTime @map("start_time")
-  endTime      DateTime @map("end_time")
-  semester     String?  @map("semester")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  subjectCode  String   @map("subject_code") @db.VarChar(191)
+  section      String   @default("A") @db.VarChar(10)
+  yearLevel    Int      @default(1) @map("year_level")
+  dayOfWeek    String   @map("day_of_week") @db.VarChar(191)
+  startTime    DateTime @map("start_time") @db.DateTime(3)
+  endTime      DateTime @map("end_time") @db.DateTime(3)
+  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
+  // Relations — these were missing
   instructor       InstructorProfile @relation(fields: [instructorId], references: [id], onDelete: Cascade)
   labRoom          LabRoom           @relation(fields: [labRoomId], references: [id], onDelete: Cascade)
+  term             Term?             @relation(fields: [termId], references: [id], onDelete: SetNull)
   classEnrollments ClassEnrollment[]
   activeSessions   ActiveSession[]
 
@@ -103,7 +107,7 @@ model ClassEnrollment {
   enrolledAt       DateTime @default(now()) @map("enrolled_at")
 
   studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  schedule       Schedule       @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  schedule       Schedule       @relation(fields: [scheduleId], references: [scheduleId], onDelete: Cascade)
 
   @@map("class_enrollment")
 }
@@ -116,7 +120,7 @@ model ActiveSession {
   endTime     DateTime? @map("end_time")
   status      String    @default("ACTIVE")
 
-  schedule       Schedule        @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  schedule       Schedule        @relation(fields: [scheduleId], references: [scheduleId], onDelete: Cascade)
   attendanceLogs AttendanceLog[]
   pcOccupancies  PcOccupancy[]
   pcIssueReports PcIssueReport[]
@@ -168,4 +172,19 @@ model PcIssueReport {
   handledBy      User?          @relation("CustodianHandledReports", fields: [handledById], references: [id], onDelete: SetNull)
 
   @@map("pc_issue_report")
+}
+
+model Term {
+  id           Int        @id @default(autoincrement()) @map("term_id")
+  academicYear String     @map("academic_year") @db.VarChar(20)
+  semester     String     @db.VarChar(20)
+  startDate    DateTime   @map("start_date") @db.Date
+  endDate      DateTime   @map("end_date") @db.Date
+  isActive     Boolean    @default(false) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+  schedules    Schedule[]
+
+  @@unique([academicYear, semester])
+  @@map("terms")
 }
