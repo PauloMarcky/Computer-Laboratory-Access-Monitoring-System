@@ -7,6 +7,7 @@ import type { AttendanceEntry, ScheduleEntry, WireframeScreenId } from '../../ty
 interface LiveAttendancePageProps {
   attendance: AttendanceEntry[];
   schedule: ScheduleEntry | null;
+  token: string; // instructor JWT, needed for the roster-filtered camera scan
   onScanStudent: (entry: AttendanceEntry) => void;
   onNavigate: (screen: WireframeScreenId) => void;
 }
@@ -14,12 +15,15 @@ interface LiveAttendancePageProps {
 export const LiveAttendancePage = ({
   attendance,
   schedule,
+  token,
   onScanStudent,
   onNavigate,
 }: LiveAttendancePageProps) => {
   const [sessionUnlocked, setSessionUnlocked] = useState(true);
   const [lastScannedName, setLastScannedName] = useState<string | null>(null);
 
+  // Only students enrolled in the verified schedule ever reach this callback:
+  // the server rejects everyone else before responding.
   const handleCameraMatch = (
     student: MatchedStudent
   ): { result: 'added' | 'duplicate'; timeIn?: string } => {
@@ -58,7 +62,15 @@ export const LiveAttendancePage = ({
       onToggleSession={() => setSessionUnlocked((previous) => !previous)}
       lastScannedName={lastScannedName}
       onStudentLogged={setLastScannedName}
-      scanner={<CameraScanner active={sessionUnlocked} onMatched={handleCameraMatch} />}
+      scanner={
+        <CameraScanner
+          active={sessionUnlocked && !!schedule && !!token}
+          scheduleId={schedule?.id ?? ''}
+          subject={schedule?.subject}
+          token={token}
+          onMatched={handleCameraMatch}
+        />
+      }
     />
   );
 };

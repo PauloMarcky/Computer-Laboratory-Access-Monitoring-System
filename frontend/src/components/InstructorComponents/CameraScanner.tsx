@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Camera, CameraOff, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { API_BASE_URL } from '../../api';
 
-// One endpoint: Express runs OCR (Python worker) and looks the student up in students.csv
+// Express runs OCR (Python worker), then only accepts students enrolled in this schedule
 const SCAN_IMAGE_URL = `${API_BASE_URL}/attendance/scan-image`;
 const SCAN_INTERVAL_MS = 700;
 const COOLDOWN_MS = 4000; // don't re-scan the same ID immediately
@@ -10,6 +10,9 @@ const FEEDBACK_MS = 2800; // how long the result overlay stays on screen
 
 interface CameraScannerProps {
   active: boolean;
+  scheduleId: string; // the schedule the instructor verified; the server filters by its roster
+  subject?: string;
+  token: string; // instructor JWT
   // return 'duplicate' (+ original timeIn) if already logged, otherwise 'added'
   onMatched: (student: MatchedStudent) => { result: 'added' | 'duplicate'; timeIn?: string } | void;
 }
@@ -68,7 +71,7 @@ class ScannerBoundary extends React.Component<
 }
 
 /* ------------------------------------------------------------------ */
-const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, onMatched }) => {
+const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, scheduleId, subject, token, onMatched }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busyRef = useRef(false);
@@ -180,9 +183,9 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, onMatched })
         // Send the cropped frame to Express (OCR + student lookup happen there)
         let apiRes: Response;
         try {
-          apiRes = await fetch(SCAN_IMAGE_URL, {
+          apiRes = await fetch(`${SCAN_IMAGE_URL}?scheduleId=${encodeURIComponent(scheduleId)}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'image/jpeg' },
+            headers: { 'Content-Type': 'image/jpeg', Authorization: `Bearer ${token}` },
             body: blob,
           });
         } catch {
@@ -197,9 +200,18 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, onMatched })
         if (!apiRes.ok) {
           let serverMsg = '';
           try {
-            serverMsg = (await apiRes.json()).message || '';
+            const body = await apiRes.json();
+            serverMsg = body.error || body.message || '';
           } catch {
             /* response was not JSON */
+          }
+          if (apiRes.status === 401) {
+            showFeedback({
+              type: 'error',
+              title: 'Session Expired',
+              detail: 'Please log in again as instructor.',
+            });
+            return;
           }
           if (apiRes.status === 503) {
             // OCR worker still starting or failed: keep trying quietly
@@ -220,7 +232,11 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, onMatched })
 
         const data = await apiRes.json();
         if (!data.detected) {
-          setStatus('Align Student ID inside the frame');
+          setStatus(
+            data.reason === 'OUTSIDE_SCHEDULE'
+              ? 'This class is not in session right now'
+              : 'Align Student ID inside the frame'
+          );
           return;
         }
 
@@ -248,6 +264,14 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, onMatched })
             course: student.course,
             timeIn: dup && outcome?.timeIn ? outcome.timeIn : student.timeIn,
           });
+        } else if (data.reason === 'NOT_ENROLLED') {
+          showFeedback({
+            type: 'nomatch',
+            title: 'Not Enrolled in This Class',
+            name: data.studentName,
+            studentId: data.studentId,
+            detail: subject ? `Not on the ${subject} class list` : 'Not on this class list',
+          });
         } else {
           showFeedback({
             type: 'nomatch',
@@ -264,7 +288,7 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, onMatched })
 
     const id = setInterval(tick, SCAN_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [active, cameraReady]);
+  }, [active, cameraReady, scheduleId, token, subject]);
 
   if (!active) {
     return (
