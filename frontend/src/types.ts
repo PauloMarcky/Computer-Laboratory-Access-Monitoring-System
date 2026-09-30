@@ -15,6 +15,8 @@ export type WireframeScreenId =
   | 'lab-staff-rooms-module'
   | 'admin-schedule-module'
   | 'admin-schedule-add-module'
+  | 'admin-schedule-roster'
+  | 'admin-subjects'
   | 'admin-teacher-workload'
   | 'admin-reports-dashboard'
   | 'admin-students-analytics'
@@ -105,6 +107,10 @@ export interface ScheduleEntry {
   department: string;
   semester: string;
   colorTheme: 'blue' | 'green' | 'amber' | 'purple';
+  // ── NEW ──
+  termId?: number | null;
+  section?: string;
+  yearLevel?: number;
 }
 
 export interface ScheduleInstructorOption {

@@ -89,6 +89,22 @@ async function main() {
     console.log('• Term already exists:', term.academicYear, term.semester);
   }
 
+  // ---- 6. Subjects ----
+  const subjectData = [
+    { code: 'IT101', title: 'Introduction to Computing', yearLevel: 1 },
+    { code: 'IT102', title: 'Computer Programming 1', yearLevel: 1 },
+    { code: 'IT201', title: 'Data Structures', yearLevel: 2 },
+    { code: 'IT202', title: 'Object-Oriented Programming', yearLevel: 2 },
+  ];
+  for (const s of subjectData) {
+    await prisma.subject.upsert({
+      where: { code: s.code },
+      update: {},
+      create: s,
+    });
+  }
+  console.log('✔ Subjects seeded:', subjectData.length);
+
   console.log('\nSeed complete.');
 }
 

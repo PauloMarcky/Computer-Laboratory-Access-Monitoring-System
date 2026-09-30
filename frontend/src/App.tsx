@@ -34,18 +34,28 @@ import { AdminTeacherWorkloadView } from './pages/AdminPages/InstructorWorkload'
 import { AdminReportsDashboardView } from './pages/AdminPages/ClassReports';
 import { AdminStudentsAnalyticsView } from './pages/AdminPages/AnalyticsReport';
 import { UserManagement } from './pages/AdminPages/UserManagement';
+import { SubjectManagerView } from './pages/AdminPages/SubjectManager';
+import { ManageRosterView } from './pages/AdminPages/ManageRosterPage';
 
 interface ApiSchedule {
   id: number;
   instructorId: number;
   labRoomId: number;
   subjectCode: string;
+  section: string;
+  yearLevel: number;
+  termId: number | null;
   dayOfWeek: string;
   startTime: string;
   endTime: string;
-  semester: string | null;
   instructor: ScheduleInstructorOption;
   labRoom: ScheduleLabRoomOption;
+  term?: {
+    id: number;
+    academicYear: string;
+    semester: string;
+    isActive: boolean;
+  } | null;
 }
 
 const apiDayToShort: Record<string, ScheduleEntry['day']> = {
@@ -94,9 +104,12 @@ const mapApiSchedule = (schedule: ApiSchedule): ScheduleEntry => ({
   teacher: `${schedule.instructor.firstName} ${schedule.instructor.lastName}`,
   room: schedule.labRoom.roomName,
   department: schedule.instructor.department || '',
-  semester: schedule.semester || '',
+  semester: schedule.term ? `${schedule.term.academicYear} ${schedule.term.semester}` : '',
   colorTheme: 'blue',
-});
+  termId: schedule.termId,
+  section: schedule.section,
+  yearLevel: schedule.yearLevel,
+} as ScheduleEntry);
 
 const addTwoHours = (time: string) => {
   const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -203,14 +216,25 @@ export default function App() {
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [activeInstructorSchedule, setActiveInstructorSchedule] = useState<ScheduleEntry | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleEntry | null>(null);
-  const [adminToken, setAdminToken] = useState('');
+  const [rosterSchedule, setRosterSchedule] = useState<ScheduleEntry | null>(null);
+  const [adminToken, setAdminToken] = useState(
+    () => localStorage.getItem('clams.adminToken') || ''
+  );
+  const [instructorToken, setInstructorToken] = useState(
+    () => localStorage.getItem('clams.instructorToken') || ''
+  );
   const [scheduleInstructors, setScheduleInstructors] = useState<ScheduleInstructorOption[]>([]);
   const [scheduleLabRooms, setScheduleLabRooms] = useState<ScheduleLabRoomOption[]>([]);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
   const [scheduleError, setScheduleError] = useState('');
 
   useEffect(() => {
-    if (currentScreen === 'login-portal') setAdminToken('');
+    if (currentScreen === 'login-portal') {
+      localStorage.removeItem('clams.adminToken');
+      localStorage.removeItem('clams.instructorToken');
+      setAdminToken('');
+      setInstructorToken('');
+    }
   }, [currentScreen]);
 
   useEffect(() => {
@@ -287,8 +311,23 @@ export default function App() {
       setSchedules(scheduleResult.schedules.map(mapApiSchedule));
     }
 
-    setAdminToken(expectedRole === 'ADMIN' ? result.token : '');
+    if (expectedRole === 'ADMIN') {
+      localStorage.setItem('clams.adminToken', result.token);
+      setAdminToken(result.token);
+    } else {
+      localStorage.removeItem('clams.adminToken');
+      setAdminToken('');
+    }
+
+    if (expectedRole === 'INSTRUCTOR') {
+      localStorage.setItem('clams.instructorToken', result.token);
+      setInstructorToken(result.token);
+    } else {
+      localStorage.removeItem('clams.instructorToken');
+      setInstructorToken('');
+    }
     setActiveInstructorSchedule(null);
+
     if (expectedRole === 'STUDENT') {
       setCurrentStudentId(schoolId);
       setSelectedPc('');
@@ -441,13 +480,24 @@ export default function App() {
       department: '',
       semester: '',
       colorTheme: 'blue',
-    });
+      termId: null,
+      section: 'A',
+      yearLevel: 1,
+    } as ScheduleEntry);
     setCurrentScreen('admin-schedule-add-module');
   };
 
   const handleSaveSchedule = async (entry: ScheduleEntry) => {
     const isUpdate = /^\d+$/.test(entry.id) && Number(entry.id) > 0;
     const dayOfWeek = shortDayToApi[entry.day];
+
+    // Cast to read the extra fields we added in the form
+    const extended = entry as ScheduleEntry & {
+      termId?: number | null;
+      section?: string;
+      yearLevel?: number;
+    };
+
     const response = await fetch(
       isUpdate ? `${API_BASE_URL}/schedules/${entry.id}` : `${API_BASE_URL}/schedules`,
       {
@@ -463,18 +513,26 @@ export default function App() {
           dayOfWeek,
           startTime: displayTimeToApi(entry.startTime),
           endTime: displayTimeToApi(entry.endTime),
-          semester: entry.semester,
+          termId: extended.termId ?? null,
+          section: extended.section ?? 'A',
+          yearLevel: extended.yearLevel ?? 1,
         }),
       }
     );
     const result = await readApiResponse<{ error?: string; schedule: ApiSchedule }>(response);
     if (!response.ok) throw new Error(result.error || 'Unable to save schedule.');
     const savedSchedule = mapApiSchedule(result.schedule);
-    setSchedules((current) => isUpdate
-      ? current.map((schedule) => schedule.id === savedSchedule.id ? savedSchedule : schedule)
-      : [...current, savedSchedule]
+    setSchedules((current) =>
+      isUpdate
+        ? current.map((schedule) => (schedule.id === savedSchedule.id ? savedSchedule : schedule))
+        : [...current, savedSchedule]
     );
     setScheduleError('');
+  };
+
+  const handleManageRoster = (entry: ScheduleEntry) => {
+    setRosterSchedule(entry);
+    setCurrentScreen('admin-schedule-roster');
   };
 
   const handleDeleteSchedule = async (id: string) => {
@@ -532,10 +590,12 @@ export default function App() {
           <LiveAttendancePage
             attendance={attendance}
             schedule={activeInstructorSchedule}
+            token={instructorToken}
             onScanStudent={handleScanStudent}
             onNavigate={setCurrentScreen}
           />
         )}
+
 
         {currentScreen === 'instructor-attendance-export' && (
           <ExportAttendancePage attendance={attendance} onNavigate={setCurrentScreen} />
@@ -610,15 +670,17 @@ export default function App() {
             instructors={scheduleInstructors}
             labRooms={scheduleLabRooms}
             error={scheduleError}
+            token={adminToken}
             onSaveSchedule={handleSaveSchedule}
             onDeleteSchedule={handleDeleteSchedule}
+            onManageRoster={handleManageRoster}
             onNavigate={setCurrentScreen}
           />
         )}
 
         {currentScreen === 'admin-teacher-workload' && (
           <AdminTeacherWorkloadView
-            workloads={[]}
+            token={adminToken}
             onNavigate={setCurrentScreen}
           />
         )}
@@ -638,6 +700,18 @@ export default function App() {
         {currentScreen === 'admin-user-management' && (
           <UserManagement
             adminToken={adminToken}
+            onNavigate={setCurrentScreen}
+          />
+        )}
+
+        {currentScreen === 'admin-subjects' && (
+          <SubjectManagerView token={adminToken} onNavigate={setCurrentScreen} />
+        )}
+
+        {currentScreen === 'admin-schedule-roster' && (
+          <ManageRosterView
+            schedule={rosterSchedule}
+            token={adminToken}
             onNavigate={setCurrentScreen}
           />
         )}

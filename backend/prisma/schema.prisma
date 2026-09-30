@@ -25,6 +25,7 @@ model User {
   studentProfile        StudentProfile?
   instructorProfile     InstructorProfile?
   handledPcIssueReports PcIssueReport[]    @relation("CustodianHandledReports")
+  custodianProfile      CustodianProfile?
 
   @@map("users")
 }
@@ -50,15 +51,16 @@ model StudentProfile {
 
 model InstructorProfile {
   id           Int      @id @default(autoincrement()) @map("instructor_profile_id")
-  instructorId Int      @unique @map("instructor_id") // Foreign key to User.id
+  instructorId Int      @unique @map("instructor_id")
   firstName    String   @map("first_name")
   lastName     String   @map("last_name")
   department   String?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  user      User       @relation(fields: [instructorId], references: [id], onDelete: Cascade)
-  schedules Schedule[]
+  user               User                @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  schedules          Schedule[]
+  instructorSubjects InstructorSubject[] // ← MOVED UP
 
   @@map("instructor_profiles")
 }
@@ -187,4 +189,43 @@ model Term {
 
   @@unique([academicYear, semester])
   @@map("terms")
+}
+
+model CustodianProfile {
+  id          Int      @id @default(autoincrement()) @map("custodian_profile_id")
+  custodianId Int      @unique @map("custodian_id")
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [custodianId], references: [id], onDelete: Cascade)
+
+  @@map("custodian_profiles")
+}
+
+model Subject {
+  id        Int      @id @default(autoincrement()) @map("subject_id")
+  code      String   @unique @db.VarChar(20)
+  title     String   @db.VarChar(191)
+  yearLevel Int?     @map("year_level")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  instructorSubjects InstructorSubject[] // ← MOVED UP
+
+  @@map("subjects")
+}
+
+model InstructorSubject {
+  id           Int      @id @default(autoincrement()) @map("instructor_subject_id")
+  instructorId Int      @map("instructor_id")
+  subjectId    Int      @map("subject_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  instructor InstructorProfile @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  subject    Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([instructorId, subjectId])
+  @@map("instructor_subjects")
 }

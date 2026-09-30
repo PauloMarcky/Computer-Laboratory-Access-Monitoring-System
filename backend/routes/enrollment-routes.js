@@ -4,10 +4,10 @@ const { authenticate, authorize } = require('../middleware/user-auth');
 const { asyncHandler: a } = require('../middleware/error-handler');
 
 const router = express.Router();
-router.use(authenticate, authorize('ADMIN', 'INSTRUCTOR'));
+router.use(authenticate);
 
-router.post('/', a(c.enroll));
-router.get('/schedule/:scheduleId', a(c.listBySchedule));
-router.delete('/:id', a(c.unenroll));
+router.get('/roster/:scheduleId', authorize('ADMIN', 'INSTRUCTOR'), a(c.getRoster));
+router.post('/', authorize('ADMIN'), a(c.bulkEnroll));
+router.delete('/:id', authorize('ADMIN'), a(c.removeEnrollment));
 
 module.exports = router;

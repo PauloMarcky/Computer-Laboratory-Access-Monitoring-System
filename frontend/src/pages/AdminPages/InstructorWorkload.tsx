@@ -1,32 +1,140 @@
-import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Search, SlidersHorizontal } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ChevronDown, ChevronUp, Search, SlidersHorizontal, Plus, Trash2 } from 'lucide-react';
 import { ClamsHeader } from '../../components/ClamsHeader';
 import { AdminSubNav } from '../../components/AdminComponents/AdminSubNav';
-import type { TeacherWorkload, WireframeScreenId } from '../../types';
+import { API_BASE_URL, readApiResponse } from '../../api';
+import type { WireframeScreenId } from '../../types';
+
+interface SubjectLite {
+  id: number;
+  code: string;
+  title: string;
+  yearLevel: number | null;
+}
+
+interface InstructorRow {
+  id: number;
+  name: string;
+  firstName: string;
+  lastName: string;
+  department: string;
+  schoolId: string;
+  subjects: SubjectLite[];
+  scheduleCount: number;
+}
 
 interface AdminTeacherWorkloadProps {
-  workloads: TeacherWorkload[];
+  token: string;
   onNavigate: (screen: WireframeScreenId) => void;
 }
 
 export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
-  workloads,
+  token,
   onNavigate,
 }) => {
-  const [expandedId, setExpandedId] = useState<string>('');
+  const [instructors, setInstructors] = useState<InstructorRow[]>([]);
+  const [allSubjects, setAllSubjects] = useState<SubjectLite[]>([]);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [deptFilter, setDeptFilter] = useState('All Departments');
-  const [statusFilter, setStatusFilter] = useState('All Staff');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const filteredTeachers = workloads.filter((t) => {
-    const matchesDept = deptFilter === 'All Departments' || t.department === deptFilter;
-    const matchesStatus = statusFilter === 'All Staff' || t.status === statusFilter;
+  // Per-row subject dropdown state
+  const [pendingSubject, setPendingSubject] = useState<Record<number, number | ''>>({});
+  const [busy, setBusy] = useState(false);
+
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const loadAll = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [workloadRes, subjectsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/instructor-subjects/workload`, { headers }),
+        fetch(`${API_BASE_URL}/subjects`, { headers }),
+      ]);
+      const workloadData = await readApiResponse<{ instructors: InstructorRow[]; error?: string }>(workloadRes);
+      const subjectsData = await readApiResponse<{ subjects: SubjectLite[]; error?: string }>(subjectsRes);
+      if (!workloadRes.ok) throw new Error(workloadData.error || 'Unable to load instructors.');
+      if (!subjectsRes.ok) throw new Error(subjectsData.error || 'Unable to load subjects.');
+      setInstructors(workloadData.instructors);
+      setAllSubjects(subjectsData.subjects);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load workload data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  const handleAssign = async (instructorId: number) => {
+    const subjectId = pendingSubject[instructorId];
+    if (!subjectId) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/instructor-subjects/${instructorId}/subjects`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subjectId }),
+      });
+      const data = await readApiResponse<{ error?: string; link: { subject: SubjectLite } }>(res);
+      if (!res.ok) throw new Error(data.error || 'Unable to assign subject.');
+      setInstructors((prev) =>
+        prev.map((i) =>
+          i.id === instructorId ? { ...i, subjects: [...i.subjects, data.link.subject] } : i
+        )
+      );
+      setPendingSubject((prev) => ({ ...prev, [instructorId]: '' }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to assign subject.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleUnassign = async (instructorId: number, subjectId: number) => {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/instructor-subjects/${instructorId}/subjects/${subjectId}`, {
+        method: 'DELETE',
+        headers,
+      });
+      if (!res.ok) {
+        const data = await readApiResponse<{ error?: string }>(res);
+        throw new Error(data.error || 'Unable to remove subject.');
+      }
+      setInstructors((prev) =>
+        prev.map((i) =>
+          i.id === instructorId
+            ? { ...i, subjects: i.subjects.filter((s) => s.id !== subjectId) }
+            : i
+        )
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to remove subject.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const filteredInstructors = instructors.filter((i) => {
+    const matchesDept = deptFilter === 'All Departments' || i.department === deptFilter;
+    const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
-      !searchQuery.trim() ||
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.assignedSubjects.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesDept && matchesStatus && matchesSearch;
+      !q ||
+      i.name.toLowerCase().includes(q) ||
+      i.subjects.some((s) => s.code.toLowerCase().includes(q) || s.title.toLowerCase().includes(q));
+    return matchesDept && matchesSearch;
   });
+
+  const departments = Array.from(new Set(instructors.map((i) => i.department).filter(Boolean)));
 
   return (
     <div className="min-h-[calc(100vh-44px)] bg-[#f4f6f9]">
@@ -34,8 +142,7 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
       <AdminSubNav activeScreen="admin-teacher-workload" onNavigate={onNavigate} />
 
       <main className="max-w-7xl mx-auto px-6 py-7 space-y-5">
-
-        {/* Filter Bar */}
+        {/* Filter bar */}
         <section className="bg-white rounded-xl border border-slate-200/90 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center gap-1.5 font-semibold text-slate-500">
@@ -51,22 +158,8 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
                 className="font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
               >
                 <option value="All Departments">All Departments</option>
-                {[...new Set(workloads.map((teacher) => teacher.department))].map((department) => (
-                  <option key={department} value={department}>{department}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
-              <span className="text-slate-400">Workload Status:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
-              >
-                <option value="All Staff">All Staff</option>
-                {[...new Set(workloads.map((teacher) => teacher.status))].map((status) => (
-                  <option key={status} value={status}>{status}</option>
+                {departments.map((d) => (
+                  <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             </div>
@@ -78,126 +171,190 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search teachers, subjects..."
+              placeholder="Search instructors or subjects..."
               className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#1b325f]"
             />
           </div>
         </section>
 
-        {/* Expandable Teacher Workload Table */}
+        {error && (
+          <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+            {error}
+          </p>
+        )}
+
+        {/* Table */}
         <section className="bg-white rounded-xl border border-slate-200/90 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-500">
-                  <th className="py-3.5 px-5">Teacher Name</th>
+                  <th className="py-3.5 px-5">Instructor</th>
                   <th className="py-3.5 px-4">Department</th>
                   <th className="py-3.5 px-4">Assigned Subjects</th>
-                  <th className="py-3.5 px-4">Total Hours</th>
-                  <th className="py-3.5 px-5 text-right">Schedule Status</th>
+                  <th className="py-3.5 px-5 text-right">Schedules</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredTeachers.map((teacher) => {
-                  const isExpanded = expandedId === teacher.id;
-                  const initials = teacher.name
-                    .replace(/^(Dr\.|Prof\.)\s+/, '')
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                    .slice(0, 2);
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className="py-10 text-center text-slate-400">
+                      Loading instructors...
+                    </td>
+                  </tr>
+                ) : filteredInstructors.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-10 text-center text-slate-400">
+                      No instructors found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredInstructors.map((teacher) => {
+                    const isExpanded = expandedId === teacher.id;
+                    const initials = teacher.name
+                      .replace(/^(Dr\.|Prof\.)\s+/, '')
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')
+                      .slice(0, 2);
 
-                  return (
-                    <React.Fragment key={teacher.id}>
-                      <tr
-                        onClick={() => setExpandedId(isExpanded ? '' : teacher.id)}
-                        className={`cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50/40' : 'hover:bg-slate-50/80'
-                          }`}
-                      >
-                        <td className="py-4 px-5">
-                          <div className="flex items-center gap-3">
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
-                            ) : (
-                              <ChevronUp className="w-4 h-4 text-slate-400 rotate-90 shrink-0" />
-                            )}
-                            <div className="w-7 h-7 rounded-full bg-[#1b325f] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
-                              {initials}
-                            </div>
-                            <span className="font-bold text-slate-900">{teacher.name}</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 text-slate-600">{teacher.department}</td>
-                        <td className="py-4 px-4">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {teacher.assignedSubjects.map((sub) => (
-                              <span
-                                key={sub}
-                                className="px-2.5 py-0.5 rounded bg-slate-100 border border-slate-200/80 text-[11px] font-medium text-slate-700 whitespace-nowrap"
-                              >
-                                {sub}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 font-bold text-slate-900 font-mono tabular-nums">
-                          {teacher.totalHours} hrs/wk
-                        </td>
-                        <td className="py-4 px-5 text-right">
-                          <span
-                            className={`inline-block px-2.5 py-0.5 rounded text-[11px] font-semibold ${teacher.status === 'Available'
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-amber-50 text-amber-700'
-                              }`}
-                          >
-                            {teacher.status}
-                          </span>
-                        </td>
-                      </tr>
+                    const availableSubjects = allSubjects.filter(
+                      (s) => !teacher.subjects.some((ts) => ts.id === s.id)
+                    );
 
-                      {isExpanded && (
-                        <tr className="bg-slate-50/50">
-                          <td colSpan={5} className="px-6 py-5 border-t border-slate-100">
-                            <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mb-3">
-                              Weekly Schedule Breakdown
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                              {(
-                                ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const
-                              ).map((dayName) => {
-                                const slot = teacher.weeklyBreakdown[dayName];
-                                return (
-                                  <div
-                                    key={dayName}
-                                    className="bg-white rounded-lg border border-slate-200/90 p-3"
-                                  >
-                                    <div className="text-[11px] font-bold text-slate-800 mb-1.5">
-                                      {dayName}
-                                    </div>
-                                    {slot ? (
-                                      <div className="text-[11px] text-slate-600 leading-relaxed">
-                                        <span className="font-semibold text-slate-800">
-                                          {slot.title}
-                                        </span>{' '}
-                                        <span className="font-mono tabular-nums text-slate-500">
-                                          {slot.detail}
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <div className="text-[11px] text-slate-300 italic">
-                                        No assignment
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                    return (
+                      <React.Fragment key={teacher.id}>
+                        <tr
+                          onClick={() => setExpandedId(isExpanded ? null : teacher.id)}
+                          className={`cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50/40' : 'hover:bg-slate-50/80'
+                            }`}
+                        >
+                          <td className="py-4 px-5">
+                            <div className="flex items-center gap-3">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+                              ) : (
+                                <ChevronUp className="w-4 h-4 text-slate-400 rotate-90 shrink-0" />
+                              )}
+                              <div className="w-7 h-7 rounded-full bg-[#1b325f] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                                {initials}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-900">{teacher.name}</div>
+                                <div className="text-[10px] text-slate-400 font-mono">
+                                  {teacher.schoolId}
+                                </div>
+                              </div>
                             </div>
                           </td>
+                          <td className="py-4 px-4 text-slate-600">
+                            {teacher.department || '—'}
+                          </td>
+                          <td className="py-4 px-4">
+                            {teacher.subjects.length === 0 ? (
+                              <span className="text-slate-400 italic text-[11px]">
+                                No subjects assigned
+                              </span>
+                            ) : (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {teacher.subjects.map((sub) => (
+                                  <span
+                                    key={sub.id}
+                                    className="px-2.5 py-0.5 rounded bg-slate-100 border border-slate-200/80 text-[11px] font-medium text-slate-700 whitespace-nowrap"
+                                  >
+                                    {sub.code}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-4 px-5 text-right font-mono tabular-nums text-slate-700">
+                            {teacher.scheduleCount}
+                          </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+
+                        {isExpanded && (
+                          <tr className="bg-slate-50/50">
+                            <td colSpan={4} className="px-6 py-5 border-t border-slate-100">
+                              <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mb-3">
+                                Manage Subjects for {teacher.name}
+                              </div>
+
+                              <div className="space-y-2 mb-4">
+                                {teacher.subjects.length === 0 ? (
+                                  <p className="text-[11px] text-slate-400 italic">
+                                    This instructor has no subjects assigned yet.
+                                  </p>
+                                ) : (
+                                  teacher.subjects.map((sub) => (
+                                    <div
+                                      key={sub.id}
+                                      className="flex items-center justify-between bg-white rounded-lg border border-slate-200 px-3 py-2"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono font-semibold text-slate-800 text-xs">
+                                          {sub.code}
+                                        </span>
+                                        <span className="text-[11px] text-slate-500">
+                                          {sub.title}
+                                        </span>
+                                        {sub.yearLevel != null && (
+                                          <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">
+                                            Year {sub.yearLevel}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <button
+                                        onClick={() => handleUnassign(teacher.id, sub.id)}
+                                        disabled={busy}
+                                        className="p-1.5 hover:bg-rose-50 rounded cursor-pointer disabled:opacity-50"
+                                        title="Remove"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                      </button>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={pendingSubject[teacher.id] ?? ''}
+                                  onChange={(e) =>
+                                    setPendingSubject((prev) => ({
+                                      ...prev,
+                                      [teacher.id]: e.target.value ? Number(e.target.value) : '',
+                                    }))
+                                  }
+                                  disabled={availableSubjects.length === 0}
+                                  className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:border-[#1b325f] disabled:opacity-60"
+                                >
+                                  <option value="">
+                                    {availableSubjects.length === 0
+                                      ? 'All subjects already assigned'
+                                      : 'Select a subject to add...'}
+                                  </option>
+                                  {availableSubjects.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.code} — {s.title}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => handleAssign(teacher.id)}
+                                  disabled={busy || !pendingSubject[teacher.id]}
+                                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#2563eb] hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+                                >
+                                  <Plus className="w-3.5 h-3.5" /> Assign
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

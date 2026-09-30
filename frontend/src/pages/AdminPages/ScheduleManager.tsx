@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, SlidersHorizontal, Trash2, Users } from 'lucide-react';
 import { ClamsHeader } from '../../components/ClamsHeader';
 import { AdminSubNav } from '../../components/AdminComponents/AdminSubNav';
+import { API_BASE_URL } from '../../api';
 import type {
   ScheduleEntry,
   ScheduleInstructorOption,
@@ -9,22 +10,23 @@ import type {
   WireframeScreenId,
 } from '../../types';
 
-interface AdminScheduleModuleProps {
-  schedules: ScheduleEntry[];
-  onEditSchedule: (entry: ScheduleEntry) => void;
-  onCreateNewSchedule: (day?: ScheduleEntry['day'], startTime?: string) => void;
-  isLoading: boolean;
-  error: string;
-  onNavigate: (screen: WireframeScreenId) => void;
+/* ---------------- Types for dropdown data ---------------- */
+
+interface SubjectOption {
+  id: number;
+  code: string;
+  title: string;
+  yearLevel?: number | null;
 }
 
-const DAYS: Array<{ key: ScheduleEntry['day']; label: string }> = [
-  { key: 'Mon', label: 'Monday' },
-  { key: 'Tue', label: 'Tuesday' },
-  { key: 'Wed', label: 'Wednesday' },
-  { key: 'Thu', label: 'Thursday' },
-  { key: 'Fri', label: 'Friday' },
-];
+interface TermOption {
+  id: number;
+  academicYear: string;
+  semester: string;
+  isActive: boolean;
+}
+
+/* ---------------- Helpers ---------------- */
 
 const timeToMinutes = (time: string) => {
   const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -50,6 +52,36 @@ const toScheduleTime = (time: string) => {
   return `${String(hour % 12 || 12).padStart(2, '0')}:${minute} ${period}`;
 };
 
+const DAYS: Array<{ key: ScheduleEntry['day']; label: string }> = [
+  { key: 'Mon', label: 'Monday' },
+  { key: 'Tue', label: 'Tuesday' },
+  { key: 'Wed', label: 'Wednesday' },
+  { key: 'Thu', label: 'Thursday' },
+  { key: 'Fri', label: 'Friday' },
+];
+
+const ALL_DAYS: ScheduleEntry['day'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const YEAR_LEVELS = [
+  { value: 1, label: '1st Year' },
+  { value: 2, label: '2nd Year' },
+  { value: 3, label: '3rd Year' },
+  { value: 4, label: '4th Year' },
+];
+
+/* ================================================================
+ * LIST VIEW — calendar grid of schedules
+ * ================================================================ */
+
+interface AdminScheduleModuleProps {
+  schedules: ScheduleEntry[];
+  onEditSchedule: (entry: ScheduleEntry) => void;
+  onCreateNewSchedule: (day?: ScheduleEntry['day'], startTime?: string) => void;
+  isLoading: boolean;
+  error: string;
+  onNavigate: (screen: WireframeScreenId) => void;
+}
+
 export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
   schedules,
   onEditSchedule,
@@ -68,6 +100,7 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
     const matchesSem = !semFilter || s.semester === semFilter;
     return matchesRoom && matchesDept && matchesSem;
   });
+
   const timeSlots = [...new Set(filteredSchedules.map((s) => s.startTime))]
     .sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
 
@@ -90,7 +123,6 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
       <AdminSubNav activeScreen="admin-schedule-module" onNavigate={onNavigate} />
 
       <main className="max-w-7xl mx-auto px-6 py-6 space-y-5">
-        {/* Filter & Create Bar */}
         <section className="bg-white rounded-xl border border-slate-200/90 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3 text-xs">
             <div className="inline-flex items-center gap-1.5 font-semibold text-slate-500 mr-1">
@@ -151,7 +183,11 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
           </button>
         </section>
 
-        {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">{error}</p>}
+        {error && (
+          <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+            {error}
+          </p>
+        )}
 
         {isLoading ? (
           <section className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
@@ -167,10 +203,7 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
                       Time
                     </th>
                     {DAYS.map((day) => (
-                      <th
-                        key={day.key}
-                        className="py-3.5 px-4 text-center border-r border-slate-100 last:border-r-0"
-                      >
+                      <th key={day.key} className="py-3.5 px-4 text-center border-r border-slate-100 last:border-r-0">
                         {day.label}
                       </th>
                     ))}
@@ -182,36 +215,21 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
                       <td className="p-3 align-middle text-center font-mono tabular-nums text-[11px] font-semibold text-slate-400 border-r border-slate-100">
                         {slot}
                       </td>
-
                       {DAYS.map((day) => {
-                        const entry = filteredSchedules.find(
-                          (s) => s.day === day.key && s.startTime === slot
-                        );
-
+                        const entry = filteredSchedules.find((s) => s.day === day.key && s.startTime === slot);
                         return (
-                          <td
-                            key={day.key}
-                            className="p-2 align-top border-r border-slate-100 last:border-r-0"
-                          >
+                          <td key={day.key} className="p-2 align-top border-r border-slate-100 last:border-r-0">
                             {entry ? (
                               <button
                                 type="button"
                                 onClick={() => onEditSchedule(entry)}
-                                className={`w-full h-full min-h-[92px] rounded-lg p-2.5 text-left flex flex-col justify-between transition-colors cursor-pointer ${getColorClasses(
-                                  entry.colorTheme
-                                )}`}
+                                className={`w-full h-full min-h-[92px] rounded-lg p-2.5 text-left flex flex-col justify-between transition-colors cursor-pointer ${getColorClasses(entry.colorTheme)}`}
                               >
                                 <div>
-                                  <div className="font-bold text-xs leading-snug line-clamp-1">
-                                    {entry.subject}
-                                  </div>
-                                  <div className="text-[11px] opacity-80 mt-0.5 truncate">
-                                    {entry.teacher}
-                                  </div>
+                                  <div className="font-bold text-xs leading-snug line-clamp-1">{entry.subject}</div>
+                                  <div className="text-[11px] opacity-80 mt-0.5 truncate">{entry.teacher}</div>
                                 </div>
-                                <div className="text-[10px] font-bold opacity-90 mt-2">
-                                  {entry.room}
-                                </div>
+                                <div className="text-[10px] font-bold opacity-90 mt-2">{entry.room}</div>
                               </button>
                             ) : (
                               <button
@@ -241,43 +259,88 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
   );
 };
 
+/* ================================================================
+ * ADD / EDIT VIEW — form to create or update one schedule
+ * ================================================================ */
+
 interface AdminScheduleAddProps {
   editingSchedule: ScheduleEntry | null;
   instructors: ScheduleInstructorOption[];
   labRooms: ScheduleLabRoomOption[];
   error: string;
+  token: string;
   onSaveSchedule: (entry: ScheduleEntry) => Promise<void>;
   onDeleteSchedule: (id: string) => Promise<void>;
+  onManageRoster: (entry: ScheduleEntry) => void;
   onNavigate: (screen: WireframeScreenId) => void;
 }
-
-const ALL_DAYS: ScheduleEntry['day'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
   editingSchedule,
   instructors,
   labRooms,
   error,
+  token,
   onSaveSchedule,
   onDeleteSchedule,
+  onManageRoster,
   onNavigate,
 }) => {
   const [labRoomId, setLabRoomId] = useState(editingSchedule?.labRoomId || 0);
-  const [subject, setSubject] = useState(editingSchedule?.subject || '');
   const [instructorId, setInstructorId] = useState(editingSchedule?.instructorId || 0);
-  const [semester, setSemester] = useState(editingSchedule?.semester || '');
-  const [actionError, setActionError] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<ScheduleEntry['day']>(
-    editingSchedule?.day || 'Mon'
-  );
+  const [selectedDay, setSelectedDay] = useState<ScheduleEntry['day']>(editingSchedule?.day || 'Mon');
   const [startTime, setStartTime] = useState(toInputTime(editingSchedule?.startTime || '02:00 PM'));
   const [endTime, setEndTime] = useState(toInputTime(editingSchedule?.endTime || '04:00 PM'));
+
+  const [subjectCode, setSubjectCode] = useState(editingSchedule?.subject || '');
+  const [termId, setTermId] = useState<number | ''>(editingSchedule?.termId ?? '');
+  const [section, setSection] = useState<string>(editingSchedule?.section || 'A');
+  const [yearLevel, setYearLevel] = useState<number>(editingSchedule?.yearLevel ?? 1);
+
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [terms, setTerms] = useState<TermOption[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(true);
+
+  const [actionError, setActionError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const headers = { Authorization: `Bearer ${token}` };
+        const [subRes, termRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/subjects`, { headers }),
+          fetch(`${API_BASE_URL}/terms`, { headers }),
+        ]);
+        const subJson = await subRes.json();
+        const termJson = await termRes.json();
+        if (cancelled) return;
+        setSubjects(subJson.subjects || []);
+        setTerms(termJson.terms || []);
+
+        if (!editingSchedule && termJson.terms?.length) {
+          const active = termJson.terms.find((t: TermOption) => t.isActive);
+          if (active) setTermId(active.id);
+        }
+      } catch {
+        if (!cancelled) setActionError('Could not load subjects or terms.');
+      } finally {
+        if (!cancelled) setLoadingOptions(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [token, editingSchedule]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setActionError('');
+
+    const selectedSubject = subjects.find((s) => s.code === subjectCode);
+    const selectedTerm = terms.find((t) => t.id === termId);
+
     const newEntry: ScheduleEntry = {
       id: editingSchedule?.id || '',
       instructorId,
@@ -285,15 +348,19 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
       day: selectedDay,
       startTime: toScheduleTime(startTime),
       endTime: toScheduleTime(endTime),
-      subject,
-      teacher: instructors.find((instructor) => instructor.id === instructorId)
-        ? `${instructors.find((instructor) => instructor.id === instructorId)!.firstName} ${instructors.find((instructor) => instructor.id === instructorId)!.lastName}`
+      subject: subjectCode,
+      teacher: instructors.find((i) => i.id === instructorId)
+        ? `${instructors.find((i) => i.id === instructorId)!.firstName} ${instructors.find((i) => i.id === instructorId)!.lastName}`
         : '',
-      room: labRooms.find((room) => room.id === labRoomId)?.roomName || '',
-      department: instructors.find((instructor) => instructor.id === instructorId)?.department || '',
-      semester,
+      room: labRooms.find((r) => r.id === labRoomId)?.roomName || '',
+      department: instructors.find((i) => i.id === instructorId)?.department || '',
+      semester: selectedTerm ? `${selectedTerm.academicYear} ${selectedTerm.semester}` : '',
       colorTheme: editingSchedule?.colorTheme || 'blue',
+      termId: termId || null,
+      section,
+      yearLevel,
     };
+
     try {
       await onSaveSchedule(newEntry);
       onNavigate('admin-schedule-module');
@@ -323,10 +390,7 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
       <AdminSubNav activeScreen="admin-schedule-add-module" onNavigate={onNavigate} />
 
       <main className="max-w-4xl mx-auto px-6 py-8">
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-xl border border-slate-200/90 p-7 space-y-6"
-        >
+        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200/90 p-7 space-y-6">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <h1 className="text-base font-bold text-slate-900">Schedule Details</h1>
             <button
@@ -338,67 +402,102 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
             </button>
           </div>
 
-          {/* 2x2 Grid Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
             <div>
-              <label className="block font-semibold text-slate-600 mb-1.5">
-                Laboratory Room
-              </label>
+              <label className="block font-semibold text-slate-600 mb-1.5">Laboratory Room</label>
               <select
                 required
                 value={labRoomId || ''}
-                onChange={(event) => setLabRoomId(Number(event.target.value))}
+                onChange={(e) => setLabRoomId(Number(e.target.value))}
                 className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f]"
               >
                 <option value="" disabled>Select a lab room</option>
-                {labRooms.map((room) => <option key={room.id} value={room.id}>{room.roomName}</option>)}
+                {labRooms.map((room) => (
+                  <option key={room.id} value={room.id}>{room.roomName}</option>
+                ))}
               </select>
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-600 mb-1.5">
-                Subject (Searchable)
-              </label>
-              <input
-                type="text"
-                required
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f]"
-                placeholder="Subject"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-600 mb-1.5">
-                Assigned Teacher
-              </label>
+              <label className="block font-semibold text-slate-600 mb-1.5">Subject</label>
               <select
                 required
-                value={instructorId || ''}
-                onChange={(event) => setInstructorId(Number(event.target.value))}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f]"
+                disabled={loadingOptions}
+                value={subjectCode}
+                onChange={(e) => setSubjectCode(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f] disabled:opacity-60"
               >
-                <option value="" disabled>Select an instructor</option>
-                {instructors.map((instructor) => (
-                  <option key={instructor.id} value={instructor.id}>
-                    {instructor.firstName} {instructor.lastName}
+                <option value="" disabled>
+                  {loadingOptions ? 'Loading subjects...' : 'Select a subject'}
+                </option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.code}>
+                    {s.code} — {s.title}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-600 mb-1.5">
-                Semester / Term
-              </label>
+              <label className="block font-semibold text-slate-600 mb-1.5">Assigned Teacher</label>
+              <select
+                required
+                value={instructorId || ''}
+                onChange={(e) => setInstructorId(Number(e.target.value))}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f]"
+              >
+                <option value="" disabled>Select an instructor</option>
+                {instructors.map((i) => (
+                  <option key={i.id} value={i.id}>{i.firstName} {i.lastName}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1.5">Semester / Term</label>
+              <select
+                required
+                disabled={loadingOptions}
+                value={termId}
+                onChange={(e) => setTermId(Number(e.target.value))}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f] disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  {loadingOptions ? 'Loading terms...' : 'Select a term'}
+                </option>
+                {terms.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.academicYear} · {t.semester}{t.isActive ? ' (Active)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1.5">Section</label>
               <input
                 type="text"
-                value={semester}
-                onChange={(e) => setSemester(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f]"
-                placeholder="Semester / term"
+                required
+                value={section}
+                onChange={(e) => setSection(e.target.value.toUpperCase())}
+                placeholder="A"
+                maxLength={10}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f] uppercase"
               />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1.5">Year Level</label>
+              <select
+                required
+                value={yearLevel}
+                onChange={(e) => setYearLevel(Number(e.target.value))}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:border-[#1b325f]"
+              >
+                {YEAR_LEVELS.map((y) => (
+                  <option key={y.value} value={y.value}>{y.label}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -406,11 +505,8 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
             <p role="alert" className="text-xs font-medium text-rose-700">{actionError || error}</p>
           )}
 
-          {/* Day of Week Selector */}
           <div className="text-xs">
-            <label className="block font-semibold text-slate-600 mb-2">
-              Day of Week
-            </label>
+            <label className="block font-semibold text-slate-600 mb-2">Day of Week</label>
             <div className="grid grid-cols-6 gap-2.5">
               {ALL_DAYS.map((day) => {
                 const active = selectedDay === day;
@@ -420,8 +516,8 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
                     type="button"
                     onClick={() => setSelectedDay(day)}
                     className={`py-2.5 rounded-lg font-semibold transition-colors cursor-pointer ${active
-                      ? 'bg-[#2563eb] text-white shadow-2xs'
-                      : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-[#2563eb] text-white shadow-2xs'
+                        : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
                       }`}
                   >
                     {day}
@@ -431,12 +527,9 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
             </div>
           </div>
 
-          {/* Start Time & End Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
             <div>
-              <label className="block font-semibold text-slate-600 mb-1.5">
-                Start Time
-              </label>
+              <label className="block font-semibold text-slate-600 mb-1.5">Start Time</label>
               <input
                 type="time"
                 required
@@ -445,11 +538,8 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
                 className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white font-mono tabular-nums text-slate-800 font-medium focus:outline-none focus:border-[#1b325f]"
               />
             </div>
-
             <div>
-              <label className="block font-semibold text-slate-600 mb-1.5">
-                End Time
-              </label>
+              <label className="block font-semibold text-slate-600 mb-1.5">End Time</label>
               <input
                 type="time"
                 required
@@ -461,17 +551,29 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
             </div>
           </div>
 
-          {/* Bottom Action Footer */}
+          {/* Footer — one row with delete/roster on the left and cancel/save on the right */}
           <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
-            <button
-              type="button"
-              onClick={() => void handleDelete()}
-              disabled={!editingSchedule || isSaving}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-rose-200 bg-rose-50/50 hover:bg-rose-100/70 text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete Schedule</span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                disabled={!editingSchedule || isSaving}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-rose-200 bg-rose-50/50 hover:bg-rose-100/70 text-rose-600 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Schedule</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => editingSchedule && onManageRoster(editingSchedule)}
+                disabled={!editingSchedule || !/^\d+$/.test(editingSchedule.id)}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Manage Roster</span>
+              </button>
+            </div>
 
             <div className="flex items-center gap-4">
               <button
@@ -483,8 +585,8 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={isSaving || !instructors.length || !labRooms.length}
-                className="px-5 py-2.5 rounded-lg bg-[#2563eb] hover:bg-blue-700 text-white text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                disabled={isSaving || !instructors.length || !labRooms.length || loadingOptions}
+                className="px-5 py-2.5 rounded-lg bg-[#2563eb] hover:bg-blue-700 text-white text-xs font-semibold transition-colors cursor-pointer shadow-2xs disabled:opacity-60"
               >
                 {isSaving ? 'Saving...' : 'Save Schedule'}
               </button>

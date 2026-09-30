@@ -21,8 +21,8 @@ export const AdminSubNav: React.FC<AdminSubNavProps> = ({ activeScreen, onNaviga
             type="button"
             onClick={() => onNavigate('admin-schedule-module')}
             className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${isSchedules
-              ? 'border-[#1b325f] text-[#1b325f]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-[#1b325f] text-[#1b325f]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
           >
             Schedules
@@ -30,10 +30,21 @@ export const AdminSubNav: React.FC<AdminSubNavProps> = ({ activeScreen, onNaviga
 
           <button
             type="button"
+            onClick={() => onNavigate('admin-subjects')}
+            className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${activeScreen === 'admin-subjects'
+                ? 'border-[#1b325f] text-[#1b325f]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+          >
+            Subjects
+          </button>
+
+          <button
+            type="button"
             onClick={() => onNavigate('admin-reports-dashboard')}
             className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${isReports
-              ? 'border-[#1b325f] text-[#1b325f]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-[#1b325f] text-[#1b325f]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
           >
             Class Reports
@@ -43,8 +54,8 @@ export const AdminSubNav: React.FC<AdminSubNavProps> = ({ activeScreen, onNaviga
             type="button"
             onClick={() => onNavigate('admin-teacher-workload')}
             className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${activeScreen === 'admin-teacher-workload'
-              ? 'border-[#1b325f] text-[#1b325f]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-[#1b325f] text-[#1b325f]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
           >
             Instructors Workload
@@ -54,8 +65,8 @@ export const AdminSubNav: React.FC<AdminSubNavProps> = ({ activeScreen, onNaviga
             type="button"
             onClick={() => onNavigate('admin-students-analytics')}
             className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${isAnalytics
-              ? 'border-[#1b325f] text-[#1b325f]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-[#1b325f] text-[#1b325f]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
           >
             Analytics Report
@@ -65,15 +76,13 @@ export const AdminSubNav: React.FC<AdminSubNavProps> = ({ activeScreen, onNaviga
             type="button"
             onClick={() => onNavigate('admin-user-management')}
             className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${activeScreen === 'admin-user-management'
-              ? 'border-[#1b325f] text-[#1b325f]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-[#1b325f] text-[#1b325f]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
           >
             User Management
           </button>
         </nav>
-
-
       </div>
     </div>
   );
