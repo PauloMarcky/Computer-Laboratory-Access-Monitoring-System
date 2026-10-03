@@ -5,8 +5,9 @@ import type { ScheduleEntry, WireframeScreenId } from '../../types';
 
 interface InstructorSessionCheckProps {
   schedules: ScheduleEntry[];
-  onStartAttendance: (schedule: ScheduleEntry) => void;
+  onStartAttendance: (schedule: ScheduleEntry) => Promise<void>;
   onNavigate: (screen: WireframeScreenId) => void;
+  onLogout?: () => void | Promise<void>;
 }
 
 const toMinutes = (time: string) => {
@@ -18,10 +19,12 @@ const toMinutes = (time: string) => {
   return hour * 60 + Number(minuteText);
 };
 
-export const InstructorSessionCheck = ({ schedules, onStartAttendance, onNavigate }: InstructorSessionCheckProps) => {
+export const InstructorSessionCheck = ({ schedules, onStartAttendance, onNavigate, onLogout }: InstructorSessionCheckProps) => {
   const [selectedScheduleId, setSelectedScheduleId] = useState('');
   const [matchedSchedule, setMatchedSchedule] = useState<ScheduleEntry | null>(null);
   const [hasChecked, setHasChecked] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState('');
   const selectedSchedule = schedules.find((schedule) => schedule.id === selectedScheduleId) || null;
   const currentTimeLabel = new Date().toLocaleTimeString('en-US', {
     hour: '2-digit',
@@ -54,7 +57,13 @@ export const InstructorSessionCheck = ({ schedules, onStartAttendance, onNavigat
 
   return (
     <div className="min-h-[calc(100vh-44px)] bg-[#f4f6f9]">
-      <ClamsHeader onNavigate={onNavigate} statusLabel="Verify Class Session" />
+      <ClamsHeader
+        onNavigate={onNavigate}
+        onLogout={onLogout}
+        statusLabel="Verify Class Session"
+        logoutTitle="End active session?"
+        logoutMessage="This active class session will be ended automatically before you return to role selection."
+      />
       <main className="mx-auto max-w-5xl px-6 py-8">
         <div className="mb-7 max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Instructor access</p>
@@ -121,11 +130,23 @@ export const InstructorSessionCheck = ({ schedules, onStartAttendance, onNavigat
                 </dl>
                 <button
                   type="button"
-                  onClick={() => onStartAttendance(matchedSchedule)}
+                  disabled={starting}
+                  onClick={async () => {
+                    setStarting(true);
+                    setStartError('');
+                    try {
+                      await onStartAttendance(matchedSchedule);
+                    } catch (error) {
+                      setStartError(error instanceof Error ? error.message : 'Unable to start session.');
+                    } finally {
+                      setStarting(false);
+                    }
+                  }}
                   className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-800"
                 >
-                  Open attendance <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  {starting ? 'Starting session...' : 'Open attendance'} <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </button>
+                {startError && <p className="mt-3 text-xs text-rose-700">{startError}</p>}
               </div>
             )}
 

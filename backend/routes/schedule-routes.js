@@ -11,6 +11,7 @@ router.get('/', authorize('ADMIN', 'INSTRUCTOR', 'CUSTODIAN'), a(c.listSchedules
 router.get('/:id', a(c.getSchedule));
 router.post('/', authorize('ADMIN'), a(c.createSchedule));
 router.patch('/:id', authorize('ADMIN'), a(c.updateSchedule));
+router.delete('/all', authorize('ADMIN'), a(c.deleteAllSchedules));
 router.delete('/:id', authorize('ADMIN'), a(c.deleteSchedule));
 
 module.exports = router;

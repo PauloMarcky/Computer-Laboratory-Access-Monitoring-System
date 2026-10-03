@@ -7,19 +7,26 @@ import type { AttendanceEntry, ScheduleEntry, WireframeScreenId } from '../../ty
 interface LiveAttendancePageProps {
   attendance: AttendanceEntry[];
   schedule: ScheduleEntry | null;
+  activeSessionId: string;
   token: string; // instructor JWT, needed for the roster-filtered camera scan
   onScanStudent: (entry: AttendanceEntry) => void;
+  onManualStudent: (schoolId: string) => Promise<AttendanceEntry>;
+  onEndSession: () => Promise<void>;
   onNavigate: (screen: WireframeScreenId) => void;
+  onLogout?: () => void | Promise<void>;
 }
 
 export const LiveAttendancePage = ({
   attendance,
   schedule,
+  activeSessionId,
   token,
   onScanStudent,
+  onManualStudent,
+  onEndSession,
   onNavigate,
+  onLogout,
 }: LiveAttendancePageProps) => {
-  const [sessionUnlocked, setSessionUnlocked] = useState(true);
   const [lastScannedName, setLastScannedName] = useState<string | null>(null);
 
   // Only students enrolled in the verified schedule ever reach this callback:
@@ -28,22 +35,20 @@ export const LiveAttendancePage = ({
     student: MatchedStudent
   ): { result: 'added' | 'duplicate'; timeIn?: string } => {
     const existing = attendance.find((entry) => entry.studentId === student.studentId);
-    if (existing) {
+    if (existing || student.alreadyLogged) {
       setLastScannedName(`${student.studentName} (${student.studentId}) is already logged`);
-      return { result: 'duplicate', timeIn: existing.timeIn };
+      return { result: 'duplicate', timeIn: existing?.timeIn || formatAttendanceTime(new Date(student.timeIn)) };
     }
-    if (!sessionUnlocked) return { result: 'duplicate' };
-
-    const now = new Date();
+    const timeIn = new Date(student.timeIn);
     const newEntry: AttendanceEntry = {
-      id: `att-${Date.now()}`,
-      timeIn: formatAttendanceTime(now),
+      id: String(student.attendanceId || `att-${Date.now()}`),
+      timeIn: formatAttendanceTime(timeIn),
       studentId: student.studentId,
       name: student.studentName,
       formalName: student.formalName || student.studentName,
       pcNumber: 'None',
       status: schedule
-        ? getAttendanceStatus(now, schedule.startTime, schedule.endTime)
+        ? getAttendanceStatus(timeIn, schedule.startTime, schedule.endTime)
         : 'On-Time',
     };
 
@@ -57,15 +62,17 @@ export const LiveAttendancePage = ({
       attendance={attendance}
       schedule={schedule}
       onScanStudent={onScanStudent}
+      onManualStudent={onManualStudent}
+      onEndSession={onEndSession}
       onNavigate={onNavigate}
-      sessionUnlocked={sessionUnlocked}
-      onToggleSession={() => setSessionUnlocked((previous) => !previous)}
+      onLogout={onLogout}
       lastScannedName={lastScannedName}
       onStudentLogged={setLastScannedName}
       scanner={
         <CameraScanner
-          active={sessionUnlocked && !!schedule && !!token}
+          active={!!schedule && !!activeSessionId && !!token}
           scheduleId={schedule?.id ?? ''}
+          activeSessionId={activeSessionId}
           subject={schedule?.subject}
           token={token}
           onMatched={handleCameraMatch}

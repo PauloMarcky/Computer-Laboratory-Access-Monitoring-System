@@ -8,6 +8,7 @@ export type WireframeScreenId =
   | 'instructor-attendance-module'
   | 'instructor-attendance-export'
   | 'student-claim-pc'
+  | 'student-report-history'
   | 'student-report-issue'
   | 'lab-staff-report-detail'
   | 'lab-staff-report-export'
@@ -28,13 +29,17 @@ export type ManagedUserRole = Exclude<UserRole, 'ADMIN'>;
 export interface ManagedUser {
   id: number;
   fullName: string | null;
+  firstName: string | null;
+  lastName: string | null;
   schoolId: string;
   role: UserRole;
+  isCurrentUser?: boolean;
 }
 
 export interface AttendanceEntry {
   id: string;
   timeIn: string;
+  timeOut?: string | null;
   studentId: string;
   name: string;
   formalName: string;
@@ -53,15 +58,20 @@ export interface PCStation {
   issueDescription?: string;
 }
 
+export type PCIssueStatus = 'PENDING' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED';
+
 export interface PCIssueReport {
   id: string;
   pcNumber: string;
   labRoom: string;
+  subjectCode?: string;
+  classDay?: string;
+  classTimeRange?: string;
   studentId: string;
   category: 'Mouse / Keyboard' | 'Monitor' | 'No Power' | 'No Network' | 'Software' | 'Other';
   description: string;
   submittedAt: string;
-  status: 'Open' | 'Resolved';
+  status: PCIssueStatus;
   custodianReport?: string;
   resolvedAt?: string;
 }
@@ -72,12 +82,16 @@ export interface LabUsageRecord {
   timeslot: string;
   laboratory: string;
   subject: string;
+  subjectName: string;
   instructor: string;
   section: string;
   yearLevel: string;
   status: 'ONGOING' | 'COMPLETED' | 'CANCELLED';
   academicYear: string;
   semester: string;
+  studentsPresent: number;
+  studentsTotal: number;
+  students: AttendanceEntry[];
 }
 
 export interface LabRoomStatus {
@@ -146,10 +160,14 @@ export interface ClassReportSubmission {
   date: string;
   subjectCode: string;
   subjectName: string;
+  section?: string;
+  yearLevel?: number;
   instructor: string;
   labRoom: string;
   sessionTime: string;
   semester: string;
+  academicYear?: string;
+  termSemester?: string;
   studentsPresent: number;
   studentsTotal: number;
   status: 'Pending' | 'Approved' | 'Rejected';

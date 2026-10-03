@@ -7,6 +7,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/me/active', authorize('STUDENT'), a(c.listMyActiveSessions));
+router.get('/reports', authorize('ADMIN'), a(c.listReports));
 router.get('/', authorize('ADMIN', 'INSTRUCTOR', 'CUSTODIAN'), a(c.listSessions));
 router.get('/:id', a(c.getSession));
 router.post('/', authorize('ADMIN', 'INSTRUCTOR'), a(c.startSession));

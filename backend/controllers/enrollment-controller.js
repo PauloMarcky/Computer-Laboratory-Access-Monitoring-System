@@ -1,5 +1,5 @@
 const prisma = require('../config/db');
-const { toId } = require('../utils/helpers');
+const { toId, getInstructorProfile } = require('../utils/helpers');
 
 // GET /api/enrollments/roster/:scheduleId
 async function getRoster(req, res) {
@@ -15,6 +15,12 @@ async function getRoster(req, res) {
     },
   });
   if (!schedule) return res.status(404).json({ error: 'Schedule not found.' });
+  if (req.user.role === 'INSTRUCTOR') {
+    const profile = await getInstructorProfile(req.user.id);
+    if (!profile || profile.id !== schedule.instructorId) {
+      return res.status(403).json({ error: 'You can only view rosters for your own schedules.' });
+    }
+  }
 
   const enrollments = await prisma.classEnrollment.findMany({
     where: { scheduleId },

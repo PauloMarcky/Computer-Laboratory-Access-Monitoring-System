@@ -1,19 +1,30 @@
 const prisma = require('../config/db');
 const { toId, getStudentProfile } = require('../utils/helpers');
 
-const STATUSES = ['PENDING', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'];
+const { STATUSES, canTransitionIssueStatus } = require('../utils/pc-issue-status');
+const CATEGORIES = ['Mouse / Keyboard', 'Monitor', 'No Power', 'No Network', 'Software', 'Other'];
 
 const include = {
-  studentProfile: { select: { id: true, firstName: true, lastName: true } },
+  studentProfile: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      user: { select: { schoolId: true } },
+    },
+  },
   activeSession: { include: { schedule: { include: { labRoom: true } } } },
   handledBy: { select: { id: true, schoolId: true } },
 };
 
 async function reportIssue(req, res) {
   const activeSessionId = toId(req.body?.activeSessionId);
-  const { pcNumber, issueDescription } = req.body || {};
+  const { pcNumber, category, issueDescription } = req.body || {};
   if (!activeSessionId || !pcNumber || typeof issueDescription !== 'string' || !issueDescription.trim()) {
     return res.status(400).json({ error: 'activeSessionId, pcNumber and issueDescription are required.' });
+  }
+  if (category !== undefined && !CATEGORIES.includes(category)) {
+    return res.status(400).json({ error: `category must be one of ${CATEGORIES.join(', ')}.` });
   }
 
   const student = await getStudentProfile(req.user.id);
@@ -23,7 +34,13 @@ async function reportIssue(req, res) {
   if (!attended) return res.status(403).json({ error: 'You did not attend this session.' });
 
   const report = await prisma.pcIssueReport.create({
-    data: { activeSessionId, studentProfileId: student.id, pcNumber: String(pcNumber), issueDescription: issueDescription.trim() },
+    data: {
+      activeSessionId,
+      studentProfileId: student.id,
+      pcNumber: String(pcNumber).trim(),
+      category: category || 'Other',
+      issueDescription: issueDescription.trim(),
+    },
     include,
   });
   return res.status(201).json({ report });
@@ -66,9 +83,17 @@ async function updateIssue(req, res) {
   if (status !== undefined) {
     const s = String(status).toUpperCase();
     if (!STATUSES.includes(s)) return res.status(400).json({ error: `status must be one of ${STATUSES.join(', ')}.` });
+    const current = await prisma.pcIssueReport.findUnique({ where: { id }, select: { status: true } });
+    if (!current) return res.status(404).json({ error: 'Report not found.' });
+    if (!canTransitionIssueStatus(current.status, s)) {
+      return res.status(409).json({ error: `Cannot change issue status from ${current.status} to ${s}.` });
+    }
     data.status = s;
   }
-  if (staffNotes !== undefined) data.staffNotes = staffNotes;
+  if (staffNotes !== undefined) {
+    if (typeof staffNotes !== 'string') return res.status(400).json({ error: 'staffNotes must be a string.' });
+    data.staffNotes = staffNotes.trim();
+  }
 
   const report = await prisma.pcIssueReport.update({ where: { id }, data, include });
   return res.json({ report });

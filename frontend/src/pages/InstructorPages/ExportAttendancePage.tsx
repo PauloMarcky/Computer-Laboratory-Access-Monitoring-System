@@ -5,9 +5,10 @@ import type { AttendanceEntry, WireframeScreenId } from '../../types';
 interface ExportAttendancePageProps {
   attendance: AttendanceEntry[];
   onNavigate: (screen: WireframeScreenId) => void;
+  onBackToSchedule: () => void;
 }
 
-export const ExportAttendancePage = ({ attendance, onNavigate }: ExportAttendancePageProps) => {
+export const ExportAttendancePage = ({ attendance, onNavigate, onBackToSchedule }: ExportAttendancePageProps) => {
   const assignedPcCount = attendance.filter((entry) => entry.pcNumber !== 'None').length;
 
   return (
@@ -50,7 +51,7 @@ export const ExportAttendancePage = ({ attendance, onNavigate }: ExportAttendanc
       </header>
 
       <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-9">
-        <InstructorAttendanceExportView attendance={attendance} onNavigate={onNavigate} />
+        <InstructorAttendanceExportView attendance={attendance} onNavigate={onNavigate} onBackToSchedule={onBackToSchedule} />
       </section>
     </main>
   );

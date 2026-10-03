@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
+const authorize = require('./authorize');
+const { isCurrentTokenVersion } = require('../utils/token-version');
 
 async function authenticate(req, res, next) {
   const authorization = req.get('authorization') || '';
@@ -31,9 +33,9 @@ async function authenticate(req, res, next) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, schoolId: true, role: true },
+      select: { id: true, schoolId: true, role: true, tokenVersion: true },
     });
-    if (!user) {
+    if (!user || !isCurrentTokenVersion(payload.tokenVersion, user.tokenVersion)) {
       return res.status(401).json({ error: 'Invalid or expired token.' });
     }
     req.user = user;
@@ -41,15 +43,6 @@ async function authenticate(req, res, next) {
   } catch (error) {
     return next(error);
   }
-}
-
-function authorize(...allowedRoles) {
-  return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'You are not allowed to perform this action.' });
-    }
-    return next();
-  };
 }
 
 module.exports = { authenticate, authorize };

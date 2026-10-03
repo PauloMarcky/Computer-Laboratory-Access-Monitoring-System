@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
 const { toId } = require('../utils/helpers');
+const { validateStudentImportRows } = require('../utils/student-import');
 
 const creatableRoles = new Set(['STUDENT', 'INSTRUCTOR', 'CUSTODIAN']);
 
@@ -17,6 +18,8 @@ function toPublicUser(user) {
     id: user.id,
     schoolId: user.schoolId,
     role: user.role,
+    firstName: profile?.firstName || null,
+    lastName: profile?.lastName || null,
     fullName: profile ? `${profile.firstName} ${profile.lastName}` : null,
     createdAt: user.createdAt,
   };
@@ -55,7 +58,7 @@ async function login(req, res) {
     });
   }
 
-  const token = jwt.sign({}, secret, {
+  const token = jwt.sign({ tokenVersion: user.tokenVersion }, secret, {
     subject: String(user.id),
     issuer: 'clams-api',
     audience: 'clams-client',
@@ -74,7 +77,6 @@ async function login(req, res) {
 
 async function listUsers(req, res) {
   const users = await prisma.user.findMany({
-    where: { role: { not: 'ADMIN' } },
     select: {
       id: true,
       schoolId: true,
@@ -86,7 +88,37 @@ async function listUsers(req, res) {
     },
     orderBy: { id: 'asc' },
   });
-  return res.json({ users: users.map(toPublicUser) });
+  return res.json({
+    users: users.map((user) => ({
+      ...toPublicUser(user),
+      isCurrentUser: user.id === req.user.id,
+    })),
+  });
+}
+
+async function deleteUser(req, res) {
+  const id = toId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid user ID.' });
+  if (id === req.user.id) return res.status(400).json({ error: 'You cannot delete your own account.' });
+
+  const outcome = await prisma.$transaction(async (tx) => {
+    const target = await tx.user.findUnique({
+      where: { id },
+      select: { id: true, role: true },
+    });
+    if (!target) return { status: 404, error: 'User not found.' };
+
+    if (target.role === 'ADMIN') {
+      const adminCount = await tx.user.count({ where: { role: 'ADMIN' } });
+      if (adminCount <= 1) return { status: 409, error: 'The last administrator account cannot be deleted.' };
+    }
+
+    await tx.user.delete({ where: { id } });
+    return { status: 204 };
+  }, { isolationLevel: 'Serializable' });
+
+  if (outcome.error) return res.status(outcome.status).json({ error: outcome.error });
+  return res.status(204).send();
 }
 
 
@@ -162,6 +194,70 @@ async function createUser(req, res) {
   }
 }
 
+async function importStudents(req, res) {
+  const validation = validateStudentImportRows(req.body?.students);
+  if (validation.errors.length) {
+    return res.status(400).json({ error: 'The student import contains invalid rows.', details: validation.errors });
+  }
+
+  const schoolIds = validation.students.map((student) => student.schoolId);
+  const findExisting = (client) => client.user.findMany({
+    where: { schoolId: { in: schoolIds } },
+    select: { schoolId: true },
+  });
+  const existing = await findExisting(prisma);
+  if (existing.length) {
+    return res.status(409).json({
+      error: 'Some school IDs already exist.',
+      schoolIds: existing.map((user) => user.schoolId),
+    });
+  }
+
+  const studentsWithHashedPasswords = await Promise.all(
+    validation.students.map(async (student) => ({
+      ...student,
+      password: await bcrypt.hash(student.password, 12),
+    }))
+  );
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const duplicates = await findExisting(tx);
+      if (duplicates.length) return { duplicates: duplicates.map((user) => user.schoolId) };
+
+      for (const student of studentsWithHashedPasswords) {
+        await tx.studentProfile.create({
+          data: {
+            firstName: student.firstName,
+            lastName: student.lastName,
+            course: student.course,
+            yearLevel: student.yearLevel,
+            user: {
+              create: {
+                schoolId: student.schoolId,
+                password: student.password,
+                role: 'STUDENT',
+              },
+            },
+          },
+        });
+      }
+
+      return { created: studentsWithHashedPasswords.length };
+    }, { isolationLevel: 'Serializable', timeout: 30000 });
+
+    if (result.duplicates) {
+      return res.status(409).json({ error: 'Some school IDs already exist.', schoolIds: result.duplicates });
+    }
+    return res.status(201).json({ created: result.created });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(409).json({ error: 'A school ID already exists; no students were imported.' });
+    }
+    throw error;
+  }
+}
+
 async function updatePassword(req, res) {
   const id = toId(req.params.id);
   const { newPassword } = req.body || {};
@@ -173,7 +269,10 @@ async function updatePassword(req, res) {
   try {
     await prisma.user.update({
       where: { id },
-      data: { password: await bcrypt.hash(newPassword, 12) },
+      data: {
+        password: await bcrypt.hash(newPassword, 12),
+        tokenVersion: { increment: 1 },
+      },
     });
   } catch (error) {
     if (error.code === 'P2025') return res.status(404).json({ error: 'User not found.' });
@@ -182,4 +281,38 @@ async function updatePassword(req, res) {
   return res.json({ message: 'Password updated.' });
 }
 
-module.exports = { login, listUsers, createUser, updatePassword };
+async function updateUserName(req, res) {
+  const id = toId(req.params.id);
+  const firstName = typeof req.body?.firstName === 'string' ? req.body.firstName.trim() : '';
+  const lastName = typeof req.body?.lastName === 'string' ? req.body.lastName.trim() : '';
+  if (!id) return res.status(400).json({ error: 'Invalid user ID.' });
+  if (id === req.user.id) return res.status(403).json({ error: 'You cannot edit your own name here.' });
+  if (!firstName || !lastName || firstName.length > 191 || lastName.length > 191) {
+    return res.status(400).json({ error: 'First and last names are required and must be 191 characters or fewer.' });
+  }
+
+  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  const profileRelations = {
+    STUDENT: { model: prisma.studentProfile, foreignKey: 'studentId' },
+    INSTRUCTOR: { model: prisma.instructorProfile, foreignKey: 'instructorId' },
+    CUSTODIAN: { model: prisma.custodianProfile, foreignKey: 'custodianId' },
+  };
+  const profile = profileRelations[user.role];
+  if (!profile) return res.status(409).json({ error: 'Administrator names cannot be edited from User Management.' });
+
+  try {
+    await profile.model.update({
+      where: { [profile.foreignKey]: id },
+      data: { firstName, lastName },
+    });
+  } catch (error) {
+    if (error.code === 'P2025') return res.status(404).json({ error: 'User profile not found.' });
+    throw error;
+  }
+
+  return res.json({ user: { id, firstName, lastName, fullName: `${firstName} ${lastName}` } });
+}
+
+module.exports = { login, listUsers, createUser, importStudents, updatePassword, updateUserName, deleteUser };

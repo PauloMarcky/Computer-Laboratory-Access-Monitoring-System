@@ -17,7 +17,6 @@ interface InstructorRow {
   name: string;
   firstName: string;
   lastName: string;
-  department: string;
   schoolId: string;
   subjects: SubjectLite[];
   scheduleCount: number;
@@ -35,7 +34,7 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
   const [instructors, setInstructors] = useState<InstructorRow[]>([]);
   const [allSubjects, setAllSubjects] = useState<SubjectLite[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [deptFilter, setDeptFilter] = useState('All Departments');
+  const [subjectFilter, setSubjectFilter] = useState('All Subjects');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -125,16 +124,15 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
   };
 
   const filteredInstructors = instructors.filter((i) => {
-    const matchesDept = deptFilter === 'All Departments' || i.department === deptFilter;
+    const matchesSubject =
+      subjectFilter === 'All Subjects' || i.subjects.some((subject) => String(subject.id) === subjectFilter);
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
       !q ||
       i.name.toLowerCase().includes(q) ||
       i.subjects.some((s) => s.code.toLowerCase().includes(q) || s.title.toLowerCase().includes(q));
-    return matchesDept && matchesSearch;
+    return matchesSubject && matchesSearch;
   });
-
-  const departments = Array.from(new Set(instructors.map((i) => i.department).filter(Boolean)));
 
   return (
     <div className="min-h-[calc(100vh-44px)] bg-[#f4f6f9]">
@@ -151,15 +149,17 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
-              <span className="text-slate-400">Department:</span>
+              <span className="text-slate-400">Subject:</span>
               <select
-                value={deptFilter}
-                onChange={(e) => setDeptFilter(e.target.value)}
+                value={subjectFilter}
+                onChange={(e) => setSubjectFilter(e.target.value)}
                 className="font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
               >
-                <option value="All Departments">All Departments</option>
-                {departments.map((d) => (
-                  <option key={d} value={d}>{d}</option>
+                <option value="All Subjects">All Subjects</option>
+                {allSubjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.code} - {subject.title}
+                  </option>
                 ))}
               </select>
             </div>
@@ -190,7 +190,7 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-500">
                   <th className="py-3.5 px-5">Instructor</th>
-                  <th className="py-3.5 px-4">Department</th>
+                  <th className="py-3.5 px-4">School ID</th>
                   <th className="py-3.5 px-4">Assigned Subjects</th>
                   <th className="py-3.5 px-5 text-right">Schedules</th>
                 </tr>
@@ -198,13 +198,13 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="py-10 text-center text-slate-400">
+                    <td colSpan={3} className="py-10 text-center text-slate-400">
                       Loading instructors...
                     </td>
                   </tr>
                 ) : filteredInstructors.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-10 text-center text-slate-400">
+                    <td colSpan={3} className="py-10 text-center text-slate-400">
                       No instructors found.
                     </td>
                   </tr>
@@ -241,14 +241,11 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
                               </div>
                               <div>
                                 <div className="font-bold text-slate-900">{teacher.name}</div>
-                                <div className="text-[10px] text-slate-400 font-mono">
-                                  {teacher.schoolId}
-                                </div>
                               </div>
                             </div>
                           </td>
-                          <td className="py-4 px-4 text-slate-600">
-                            {teacher.department || '—'}
+                          <td className="py-4 px-4 font-mono text-slate-600">
+                            {teacher.schoolId}
                           </td>
                           <td className="py-4 px-4">
                             {teacher.subjects.length === 0 ? (

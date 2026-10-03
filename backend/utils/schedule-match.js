@@ -23,7 +23,46 @@ function nowInSchoolTime(date = new Date()) {
   };
 }
 
+function schoolTimeMinutes(date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type).value;
+  return (Number(get('hour')) % 24) * 60 + Number(get('minute'));
+}
+
 const minutesOfDay = (d) => d.getUTCHours() * 60 + d.getUTCMinutes();
+
+function getAttendanceStatus(timeIn, schedule) {
+  const start = minutesOfDay(new Date(schedule.startTime));
+  const end = minutesOfDay(new Date(schedule.endTime));
+  if (end <= start) return 'On-Time';
+  const lateAfter = start + (end - start) * 0.25;
+  return schoolTimeMinutes(new Date(timeIn)) >= lateAfter ? 'Late' : 'On-Time';
+}
+
+function formatSchoolDate(date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function formatSchoolTime(date) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date);
+}
 
 // True when the schedule is for today and the current time is inside
 // [start - early grace, end).
@@ -35,4 +74,10 @@ function isScheduleOpenNow(schedule, date = new Date()) {
   return minutes >= start - EARLY_GRACE_MIN && minutes < end;
 }
 
-module.exports = { nowInSchoolTime, isScheduleOpenNow };
+module.exports = {
+  nowInSchoolTime,
+  isScheduleOpenNow,
+  getAttendanceStatus,
+  formatSchoolDate,
+  formatSchoolTime,
+};

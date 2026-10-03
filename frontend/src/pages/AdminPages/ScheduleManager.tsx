@@ -60,7 +60,7 @@ const DAYS: Array<{ key: ScheduleEntry['day']; label: string }> = [
   { key: 'Fri', label: 'Friday' },
 ];
 
-const ALL_DAYS: ScheduleEntry['day'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const ALL_DAYS: ScheduleEntry['day'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
 const YEAR_LEVELS = [
   { value: 1, label: '1st Year' },
@@ -77,6 +77,7 @@ interface AdminScheduleModuleProps {
   schedules: ScheduleEntry[];
   onEditSchedule: (entry: ScheduleEntry) => void;
   onCreateNewSchedule: (day?: ScheduleEntry['day'], startTime?: string) => void;
+  onDeleteAllSchedules: () => Promise<void>;
   isLoading: boolean;
   error: string;
   onNavigate: (screen: WireframeScreenId) => void;
@@ -86,6 +87,7 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
   schedules,
   onEditSchedule,
   onCreateNewSchedule,
+  onDeleteAllSchedules,
   isLoading,
   error,
   onNavigate,
@@ -93,16 +95,38 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
   const [roomFilter, setRoomFilter] = useState('All Rooms');
   const [deptFilter, setDeptFilter] = useState('All Depts');
   const [semFilter, setSemFilter] = useState('');
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
+
+  const handleDeleteAllSchedules = async () => {
+    setIsDeletingAll(true);
+    setDeleteError('');
+    try {
+      await onDeleteAllSchedules();
+      setIsDeleteConfirmationOpen(false);
+    } catch (deleteError) {
+      setDeleteError(deleteError instanceof Error ? deleteError.message : 'Unable to delete schedules.');
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
 
   const filteredSchedules = schedules.filter((s) => {
     const matchesRoom = roomFilter === 'All Rooms' || s.room.includes(roomFilter);
-    const matchesDept = deptFilter === 'All Depts' || s.department === deptFilter;
     const matchesSem = !semFilter || s.semester === semFilter;
-    return matchesRoom && matchesDept && matchesSem;
+    return matchesRoom && matchesSem;
   });
 
   const timeSlots = [...new Set(filteredSchedules.map((s) => s.startTime))]
     .sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
+
+  const groupedSchedules = filteredSchedules.reduce<Record<string, ScheduleEntry[]>>((acc, schedule) => {
+    const key = `${schedule.day}|${schedule.startTime}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(schedule);
+    return acc;
+  }, {});
 
   const getColorClasses = (theme: ScheduleEntry['colorTheme']) => {
     switch (theme) {
@@ -145,20 +169,6 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
-              <span className="text-slate-400">Department:</span>
-              <select
-                value={deptFilter}
-                onChange={(e) => setDeptFilter(e.target.value)}
-                className="font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
-              >
-                <option value="All Depts">All Depts</option>
-                {[...new Set(schedules.map((schedule) => schedule.department))].map((department) => (
-                  <option key={department} value={department}>{department}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
               <span className="text-slate-400">Semester:</span>
               <select
                 value={semFilter}
@@ -172,20 +182,30 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
               </select>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => onCreateNewSchedule('Mon', '02:00 PM')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#2563eb] hover:bg-blue-700 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Create Schedule</span>
-          </button>
+          <div className='flex gap-2'>
+            <button
+              type="button"
+              onClick={() => setIsDeleteConfirmationOpen(true)}
+              disabled={!schedules.length || isLoading || isDeletingAll}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-rose-200 bg-rose-50/50 hover:bg-rose-100/70 text-rose-600 text-xs font-semibold transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{isDeletingAll ? 'Deleting...' : 'Delete All Schedule'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onCreateNewSchedule('Mon', '02:00 PM')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#2563eb] hover:bg-blue-700 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create Schedule</span>
+            </button>
+          </div>
         </section>
 
-        {error && (
+        {(error || deleteError) && (
           <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
-            {error}
+            {deleteError || error}
           </p>
         )}
 
@@ -216,21 +236,26 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
                         {slot}
                       </td>
                       {DAYS.map((day) => {
-                        const entry = filteredSchedules.find((s) => s.day === day.key && s.startTime === slot);
+                        const cellEntries = groupedSchedules[`${day.key}|${slot}`] || [];
                         return (
                           <td key={day.key} className="p-2 align-top border-r border-slate-100 last:border-r-0">
-                            {entry ? (
-                              <button
-                                type="button"
-                                onClick={() => onEditSchedule(entry)}
-                                className={`w-full h-full min-h-[92px] rounded-lg p-2.5 text-left flex flex-col justify-between transition-colors cursor-pointer ${getColorClasses(entry.colorTheme)}`}
-                              >
-                                <div>
-                                  <div className="font-bold text-xs leading-snug line-clamp-1">{entry.subject}</div>
-                                  <div className="text-[11px] opacity-80 mt-0.5 truncate">{entry.teacher}</div>
-                                </div>
-                                <div className="text-[10px] font-bold opacity-90 mt-2">{entry.room}</div>
-                              </button>
+                            {cellEntries.length > 0 ? (
+                              <div className="space-y-1.5">
+                                {cellEntries.map((entry) => (
+                                  <button
+                                    key={`${entry.id}-${entry.room}-${entry.subject}`}
+                                    type="button"
+                                    onClick={() => onEditSchedule(entry)}
+                                    className={`w-full min-h-[92px] rounded-lg p-2.5 text-left flex flex-col justify-between transition-colors cursor-pointer ${getColorClasses(entry.colorTheme)}`}
+                                  >
+                                    <div>
+                                      <div className="font-bold text-xs leading-snug line-clamp-1">{entry.subject}</div>
+                                      <div className="text-[11px] opacity-80 mt-0.5 truncate">{entry.teacher}</div>
+                                    </div>
+                                    <div className="text-[10px] font-bold opacity-90 mt-2">{entry.room}</div>
+                                  </button>
+                                ))}
+                              </div>
                             ) : (
                               <button
                                 type="button"
@@ -255,6 +280,49 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
           </section>
         )}
       </main>
+
+      {isDeleteConfirmationOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-schedules-title"
+            aria-describedby="delete-schedules-description"
+            className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-xl"
+          >
+            <h2 id="delete-schedules-title" className="text-base font-bold text-slate-900">
+              Delete all schedules?
+            </h2>
+            <p id="delete-schedules-description" className="mt-2 text-sm leading-6 text-slate-600">
+              This permanently deletes all {schedules.length} schedules, along with their enrollments and active sessions.
+            </p>
+            {deleteError && (
+              <p role="alert" className="mt-3 text-xs font-medium text-rose-700">
+                {deleteError}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteConfirmationOpen(false)}
+                disabled={isDeletingAll}
+                className="rounded-md border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteAllSchedules()}
+                disabled={isDeletingAll}
+                className="inline-flex items-center gap-1.5 rounded-md bg-rose-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-rose-800 disabled:cursor-wait disabled:opacity-60"
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                {isDeletingAll ? 'Deleting...' : 'Delete all'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 };
@@ -298,6 +366,7 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
   const [yearLevel, setYearLevel] = useState<number>(editingSchedule?.yearLevel ?? 1);
 
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [assignedSubjectIds, setAssignedSubjectIds] = useState<number[]>([]);
   const [terms, setTerms] = useState<TermOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
 
@@ -332,6 +401,30 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
     void load();
     return () => { cancelled = true; };
   }, [token, editingSchedule]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAssignments = async () => {
+      if (!instructorId) {
+        setAssignedSubjectIds([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/instructor-subjects/${instructorId}/subjects`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load instructor subjects.');
+        if (!cancelled) setAssignedSubjectIds((data.subjects || []).map((subject: SubjectOption) => subject.id));
+      } catch {
+        if (!cancelled) setAssignedSubjectIds([]);
+      }
+    };
+    void loadAssignments();
+    return () => { cancelled = true; };
+  }, [instructorId, token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -393,13 +486,6 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200/90 p-7 space-y-6">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <h1 className="text-base font-bold text-slate-900">Schedule Details</h1>
-            <button
-              type="button"
-              onClick={() => onNavigate('admin-teacher-workload')}
-              className="text-xs font-semibold text-[#2563eb] hover:underline cursor-pointer"
-            >
-              View Teacher Workload &rarr;
-            </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
@@ -430,11 +516,26 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
                 <option value="" disabled>
                   {loadingOptions ? 'Loading subjects...' : 'Select a subject'}
                 </option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.code}>
-                    {s.code} — {s.title}
-                  </option>
-                ))}
+                {subjects.some((subject) => assignedSubjectIds.includes(subject.id)) && (
+                  <optgroup label="Assigned to selected teacher">
+                    {subjects
+                      .filter((subject) => assignedSubjectIds.includes(subject.id))
+                      .map((subject) => (
+                        <option key={subject.id} value={subject.code}>
+                          {subject.code} — {subject.title}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
+                <optgroup label="Other subjects">
+                  {subjects
+                    .filter((subject) => !assignedSubjectIds.includes(subject.id))
+                    .map((subject) => (
+                      <option key={subject.id} value={subject.code}>
+                        {subject.code} — {subject.title}
+                      </option>
+                    ))}
+                </optgroup>
               </select>
             </div>
 
@@ -507,7 +608,7 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
 
           <div className="text-xs">
             <label className="block font-semibold text-slate-600 mb-2">Day of Week</label>
-            <div className="grid grid-cols-6 gap-2.5">
+            <div className="grid grid-cols-5 gap-2.5">
               {ALL_DAYS.map((day) => {
                 const active = selectedDay === day;
                 return (
@@ -516,8 +617,8 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
                     type="button"
                     onClick={() => setSelectedDay(day)}
                     className={`py-2.5 rounded-lg font-semibold transition-colors cursor-pointer ${active
-                        ? 'bg-[#2563eb] text-white shadow-2xs'
-                        : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+                      ? 'bg-[#2563eb] text-white shadow-2xs'
+                      : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
                       }`}
                   >
                     {day}
@@ -571,7 +672,7 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
               >
                 <Users className="w-3.5 h-3.5" />
-                <span>Manage Roster</span>
+                <span>Manage Student Enrollment</span>
               </button>
             </div>
 

@@ -1,16 +1,22 @@
 import React from 'react';
 import { LogOut } from 'lucide-react';
-import universityLogo from '../assets/images/uls-cit-logo.png';
+import universityLogo from '../assets/images/CLAMS-removebg.png';
 import { WireframeScreenId } from '../types';
 
 interface ClamsHeaderProps {
   onNavigate: (screen: WireframeScreenId) => void;
   statusLabel?: string;
+  onLogout?: () => void | Promise<void>;
+  logoutTitle?: string;
+  logoutMessage?: string;
 }
 
 export const ClamsHeader: React.FC<ClamsHeaderProps> = ({
   onNavigate,
   statusLabel = 'Computer Laboratory System',
+  onLogout,
+  logoutTitle = 'Log out?',
+  logoutMessage = 'You will return to role selection.',
 }) => {
   const logoutDialogRef = React.useRef<HTMLDialogElement>(null);
 
@@ -18,8 +24,12 @@ export const ClamsHeader: React.FC<ClamsHeaderProps> = ({
     logoutDialogRef.current?.showModal();
   };
 
-  const confirmLogout = () => {
+  const confirmLogout = async () => {
     logoutDialogRef.current?.close();
+    if (onLogout) {
+      await onLogout();
+      return;
+    }
     onNavigate('login-portal');
   };
 
@@ -27,12 +37,7 @@ export const ClamsHeader: React.FC<ClamsHeaderProps> = ({
     <header className="bg-[#1b325f] text-white px-6 py-3.5 border-b border-[#142547] no-print">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         {/* Zone 1: Brand mark */}
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex items-center gap-3 text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded-lg"
-          title="Log out and return to Access Level Portal"
-        >
+        <div className="flex items-center gap-3 text-left">
           <img
             src={universityLogo}
             alt="University of La Salette logo"
@@ -46,7 +51,7 @@ export const ClamsHeader: React.FC<ClamsHeaderProps> = ({
               University of La Salette, Inc.
             </div>
           </div>
-        </button>
+        </div>
 
         {/* Zone 3: Active Lab Status & Portal Switcher */}
         <div className="flex items-center gap-3">
@@ -79,15 +84,14 @@ export const ClamsHeader: React.FC<ClamsHeaderProps> = ({
       >
         <div className="p-6">
           <h2 id="logout-dialog-title" className="text-lg font-semibold text-slate-900">
-            Log out?
+            {logoutTitle}
           </h2>
           <p id="logout-dialog-description" className="mt-2 text-sm leading-6 text-slate-600">
-            You will return to role selection.
+            {logoutMessage}
           </p>
           <div className="mt-6 flex justify-end gap-3">
             <button
               type="button"
-              autoFocus
               onClick={() => logoutDialogRef.current?.close()}
               className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
             >

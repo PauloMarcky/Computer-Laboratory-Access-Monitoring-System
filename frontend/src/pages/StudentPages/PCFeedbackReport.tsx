@@ -6,8 +6,10 @@ import type { PCIssueReport, WireframeScreenId } from '../../types';
 interface StudentReportIssueProps {
   selectedPc: string;
   reports: PCIssueReport[];
-  onSubmitIssue: (category: PCIssueReport['category'], description: string) => void;
+  canSubmitIssue: boolean;
+  onSubmitIssue: (category: PCIssueReport['category'], description: string) => Promise<void>;
   onNavigate: (screen: WireframeScreenId) => void;
+  onLogout?: () => void | Promise<void>;
 }
 
 const ISSUE_CATEGORIES: PCIssueReport['category'][] = [
@@ -22,32 +24,46 @@ const ISSUE_CATEGORIES: PCIssueReport['category'][] = [
 export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
   selectedPc,
   reports,
+  canSubmitIssue,
   onSubmitIssue,
   onNavigate,
+  onLogout,
 }) => {
   const [selectedCategory, setSelectedCategory] =
     useState<PCIssueReport['category']>('Mouse / Keyboard');
   const [description, setDescription] = useState('');
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedDescription = description.trim();
     if (!selectedPc || !trimmedDescription) return;
 
-    onSubmitIssue(selectedCategory, trimmedDescription);
-    setSubmittedSuccess(true);
-    setDescription('');
+    setSubmitting(true);
+    setError('');
+    try {
+      await onSubmitIssue(selectedCategory, trimmedDescription);
+      setSubmittedSuccess(true);
+      setDescription('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to submit the issue report.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-[calc(100vh-44px)] bg-[#f4f6f9]">
-      <ClamsHeader onNavigate={onNavigate} statusLabel="Computer Laboratory System" />
+      <ClamsHeader onNavigate={onNavigate} statusLabel="Computer Laboratory System" onLogout={onLogout} />
 
       <main className="max-w-3xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Report a PC Issue</h1>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              {canSubmitIssue ? 'Report a PC Issue' : 'My PC Reports'}
+            </h1>
             <p className="text-xs text-slate-500 mt-1 font-mono tabular-nums">
               {selectedPc ? `PC-${selectedPc}` : 'No PC selected'}
             </p>
@@ -63,7 +79,7 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
           </button>
         </div>
 
-        <form
+        {canSubmitIssue && <form
           onSubmit={handleSubmit}
           className="mt-6 bg-white rounded-xl border border-slate-200/90 p-6 space-y-5"
         >
@@ -117,11 +133,13 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
 
           <button
             type="submit"
-            disabled={!selectedPc || !description.trim()}
+            disabled={!selectedPc || !description.trim() || submitting}
             className="w-full py-3.5 px-6 rounded-lg bg-[#1b325f] hover:bg-[#142547] text-white font-semibold text-xs transition-colors cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Submit Report
+            {submitting ? 'Submitting...' : 'Submit Report'}
           </button>
+
+          {error && <p className="text-xs text-rose-700">{error}</p>}
 
           {submittedSuccess && (
             <div className="flex items-center justify-between gap-3 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-xs text-emerald-800">
@@ -138,29 +156,60 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
               </button>
             </div>
           )}
-        </form>
+        </form>}
 
-        {reports.length > 0 && (
+        {reports.length > 0 ? (
           <div className="mt-6 bg-white rounded-xl border border-slate-200/80 p-4">
-            <div className="text-xs font-bold text-slate-700 mb-2">
-              Recent Reports Logged in Session ({reports.length})
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="text-xs font-bold text-slate-700">
+                My Reports ({reports.length})
+              </div>
+              <span className="text-[11px] text-slate-500">Updated by lab staff</span>
             </div>
-            <div className="divide-y divide-slate-100 text-xs">
+            <div className="space-y-3 text-xs">
               {reports.map((report) => (
-                <div key={report.id} className="py-2 flex items-center justify-between gap-4">
-                  <div>
-                    <span className="font-mono font-semibold text-slate-800">{report.pcNumber}</span>
-                    <span className="mx-1.5 text-slate-300">·</span>
-                    <span className="font-semibold text-slate-700">{report.category}</span>
-                    <span className="mx-1.5 text-slate-300">·</span>
-                    <span className="text-slate-500">{report.description}</span>
+                <div key={report.id} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-semibold text-slate-800">{report.pcNumber}</span>
+                      <span className="text-slate-300">·</span>
+                      <span className="font-semibold text-slate-700">{report.category}</span>
+                    </div>
+                    <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${report.status === 'RESOLVED'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : report.status === 'REJECTED'
+                        ? 'bg-rose-100 text-rose-700'
+                        : report.status === 'IN_PROGRESS'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-slate-200 text-slate-700'}`}>
+                      {report.status.replace('_', ' ')}
+                    </span>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-400 whitespace-nowrap">
-                    {report.submittedAt}
-                  </span>
+
+                  <div className="mt-2 text-[11px] text-slate-600 font-medium">
+                    {report.subjectCode || 'Subject'} • {report.classDay || 'Day'} • {report.classTimeRange || 'Time'}
+                  </div>
+
+                  <p className="mt-2 text-slate-600">{report.description}</p>
+                  <p className="mt-2 text-[11px] text-slate-500">Submitted {report.submittedAt}</p>
+
+                  <div className="mt-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                      Custodian update
+                    </div>
+                    {report.custodianReport ? (
+                      <p className="text-slate-700 leading-5">{report.custodianReport}</p>
+                    ) : (
+                      <p className="text-slate-400">Waiting for a custodian update on this report.</p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
+          </div>
+        ) : (
+          <div className="mt-6 bg-white rounded-xl border border-dashed border-slate-200 p-5 text-center text-xs text-slate-500">
+            No reports submitted yet. Once you submit a lab issue, it will appear here with the latest custodian update.
           </div>
         )}
       </main>

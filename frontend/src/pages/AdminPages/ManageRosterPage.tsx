@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, UserPlus, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, Search, UserPlus, Trash2, Users } from 'lucide-react';
 import { ClamsHeader } from '../../components/ClamsHeader';
 import { AdminSubNav } from '../../components/AdminComponents/AdminSubNav';
 import { API_BASE_URL, readApiResponse } from '../../api';
@@ -56,7 +56,11 @@ export const ManageRosterView: React.FC<Props> = ({ schedule, token, onNavigate 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
   const load = async () => {
-    if (!schedule) return;
+    if (!schedule) {
+      setLoading(false);
+      setError('No schedule selected. Return to schedules and open enrollment from a saved schedule.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -150,10 +154,13 @@ export const ManageRosterView: React.FC<Props> = ({ schedule, token, onNavigate 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-5">
         <div>
           <button
+            type="button"
             onClick={() => onNavigate('admin-schedule-module')}
-            className="text-[11px] text-slate-500 hover:text-slate-800 mb-1 cursor-pointer"
+            className="mb-3 inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+            title="Return to the schedule list"
           >
-            ← Back to Schedules
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back to Schedule List
           </button>
           <h1 className="text-lg font-bold text-slate-900">
             {data ? `${data.schedule.subjectCode} · Section ${data.schedule.section}` : 'Manage Roster'}
@@ -224,8 +231,8 @@ export const ManageRosterView: React.FC<Props> = ({ schedule, token, onNavigate 
                       <label
                         key={s.studentProfileId}
                         className={`flex items-center gap-2 px-3 py-2 rounded cursor-pointer text-xs transition-colors ${checked
-                            ? 'bg-blue-50 border border-blue-200'
-                            : 'hover:bg-slate-50 border border-transparent'
+                          ? 'bg-blue-50 border border-blue-200'
+                          : 'hover:bg-slate-50 border border-transparent'
                           }`}
                       >
                         <input

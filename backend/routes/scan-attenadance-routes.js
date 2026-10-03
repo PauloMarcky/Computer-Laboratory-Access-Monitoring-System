@@ -13,5 +13,6 @@ router.post(
   express.raw({ type: 'image/jpeg', limit: '3mb' }),
   a(c.scanImageForSchedule),
 );
+router.post('/manual', authenticate, authorize('ADMIN', 'INSTRUCTOR'), a(c.manualTimeIn));
 
 module.exports = router;

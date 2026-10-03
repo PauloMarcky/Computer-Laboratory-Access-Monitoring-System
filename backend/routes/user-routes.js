@@ -8,7 +8,10 @@ const router = express.Router();
 router.post('/login', asyncHandler(userController.login));
 router.use(authenticate);
 router.get('/', authorize('ADMIN'), asyncHandler(userController.listUsers));
+router.post('/import/students', authorize('ADMIN'), asyncHandler(userController.importStudents));
 router.post('/', authorize('ADMIN'), asyncHandler(userController.createUser));
+router.delete('/:id', authorize('ADMIN'), asyncHandler(userController.deleteUser));
 router.patch('/:id/password', authorize('ADMIN'), asyncHandler(userController.updatePassword));
+router.patch('/:id/name', authorize('ADMIN'), asyncHandler(userController.updateUserName));
 
 module.exports = router;

@@ -1,5 +1,5 @@
 const prisma = require('../config/db');
-const { toId, getStudentProfile } = require('../utils/helpers');
+const { toId, getStudentProfile, getInstructorProfile } = require('../utils/helpers');
 
 async function claimPc(req, res) {
   const activeSessionId = toId(req.body?.activeSessionId);
@@ -11,48 +11,67 @@ async function claimPc(req, res) {
   const student = await getStudentProfile(req.user.id);
   if (!student) return res.status(404).json({ error: 'Student profile not found.' });
 
-  const session = await prisma.activeSession.findUnique({
-    where: { id: activeSessionId },
-    include: { schedule: true },
-  });
-  if (!session || session.status !== 'ACTIVE') return res.status(400).json({ error: 'Session is not active.' });
+  try {
+    const outcome = await prisma.$transaction(async (tx) => {
+      const session = await tx.activeSession.findUnique({
+        where: { id: activeSessionId },
+        include: { schedule: true },
+      });
+      if (!session || session.status !== 'ACTIVE') return { status: 400, error: 'Session is not active.' };
 
-  const timedIn = await prisma.attendanceLog.findFirst({
-    where: { studentProfileId: student.id, activeSessionId, timeOut: null },
-  });
-  if (!timedIn) return res.status(403).json({ error: 'Time in before claiming a PC.' });
+      const timedIn = await tx.attendanceLog.findFirst({
+        where: { studentProfileId: student.id, activeSessionId, timeOut: null },
+      });
+      if (!timedIn) return { status: 403, error: 'Time in before claiming a PC.' };
 
-  const mine = await prisma.pcOccupancy.findFirst({
-    where: { studentProfileId: student.id, activeSessionId, timeReleased: null },
-  });
-  if (mine) return res.status(409).json({ error: `You already occupy PC ${mine.pcNumber}. Release it first.` });
+      const mine = await tx.pcOccupancy.findFirst({
+        where: { studentProfileId: student.id, activeSessionId, timeReleased: null },
+      });
+      if (mine) return { status: 409, error: `You already occupy PC ${mine.pcNumber}. Release it first.` };
 
-  // A PC belongs to a lab room, so check every active session in the same room.
-  const taken = await prisma.pcOccupancy.findFirst({
-    where: {
-      pcNumber,
-      timeReleased: null,
-      activeSession: { status: 'ACTIVE', schedule: { labRoomId: session.schedule.labRoomId } },
-    },
-  });
-  if (taken) return res.status(409).json({ error: 'That PC is already occupied.' });
+      const taken = await tx.pcOccupancy.findFirst({
+        where: {
+          pcNumber,
+          timeReleased: null,
+          activeSession: { status: 'ACTIVE', schedule: { labRoomId: session.schedule.labRoomId } },
+        },
+      });
+      if (taken) return { status: 409, error: 'That PC is already occupied.' };
 
-  const occupancy = await prisma.pcOccupancy.create({
-    data: { activeSessionId, studentProfileId: student.id, pcNumber },
-  });
-  return res.status(201).json({ occupancy });
+      return {
+        status: 201,
+        occupancy: await tx.pcOccupancy.create({
+          data: { activeSessionId, studentProfileId: student.id, pcNumber },
+        }),
+      };
+    }, { isolationLevel: 'Serializable' });
+    if (outcome.error) return res.status(outcome.status).json({ error: outcome.error });
+    return res.status(201).json({ occupancy: outcome.occupancy });
+  } catch (error) {
+    if (error.code === 'P2034') return res.status(409).json({ error: 'PC availability changed. Refresh and choose another station.' });
+    throw error;
+  }
 }
 
 async function releasePc(req, res) {
   const id = toId(req.params.id);
   if (!id) return res.status(400).json({ error: 'Invalid id.' });
 
-  const occupancy = await prisma.pcOccupancy.findUnique({ where: { id }, include: { studentProfile: true } });
+  const occupancy = await prisma.pcOccupancy.findUnique({
+    where: { id },
+    include: { studentProfile: true, activeSession: { include: { schedule: true } } },
+  });
   if (!occupancy) return res.status(404).json({ error: 'Record not found.' });
 
   const isOwner = occupancy.studentProfile.studentId === req.user.id;
   if (!isOwner && !['ADMIN', 'INSTRUCTOR'].includes(req.user.role)) {
     return res.status(403).json({ error: 'You cannot release this PC.' });
+  }
+  if (!isOwner && req.user.role === 'INSTRUCTOR') {
+    const profile = await getInstructorProfile(req.user.id);
+    if (!profile || profile.id !== occupancy.activeSession.schedule.instructorId) {
+      return res.status(403).json({ error: 'You can only release PCs in your own sessions.' });
+    }
   }
   if (occupancy.timeReleased) return res.status(409).json({ error: 'PC already released.' });
 
@@ -66,6 +85,17 @@ async function listBySession(req, res) {
   const where = { activeSessionId };
   if (req.query.occupied === 'true') where.timeReleased = null;
 
+  if (req.user.role === 'INSTRUCTOR') {
+    const profile = await getInstructorProfile(req.user.id);
+    const session = await prisma.activeSession.findUnique({
+      where: { id: activeSessionId },
+      include: { schedule: true },
+    });
+    if (!session || !profile || session.schedule.instructorId !== profile.id) {
+      return res.status(403).json({ error: 'This is not your session.' });
+    }
+  }
+
   const occupancies = await prisma.pcOccupancy.findMany({
     where,
     include: { studentProfile: { select: { id: true, firstName: true, lastName: true } } },
@@ -74,4 +104,44 @@ async function listBySession(req, res) {
   return res.json({ occupancies });
 }
 
-module.exports = { claimPc, releasePc, listBySession };
+async function getMyOccupancy(req, res) {
+  const activeSessionId = toId(req.params.sessionId);
+  if (!activeSessionId) return res.status(400).json({ error: 'Invalid sessionId.' });
+
+  const student = await getStudentProfile(req.user.id);
+  if (!student) return res.status(404).json({ error: 'Student profile not found.' });
+  const enrollment = await prisma.classEnrollment.findFirst({
+    where: {
+      studentProfileId: student.id,
+      schedule: { activeSessions: { some: { id: activeSessionId } } },
+    },
+  });
+  if (!enrollment) return res.status(403).json({ error: 'You are not enrolled in this session.' });
+
+  const occupancy = await prisma.pcOccupancy.findFirst({
+    where: { activeSessionId, studentProfileId: student.id, timeReleased: null },
+  });
+  return res.json({ occupancy });
+}
+
+async function listAvailability(req, res) {
+  const activeSessionId = toId(req.params.sessionId);
+  if (!activeSessionId) return res.status(400).json({ error: 'Invalid sessionId.' });
+  const student = await getStudentProfile(req.user.id);
+  if (!student) return res.status(404).json({ error: 'Student profile not found.' });
+  const enrollment = await prisma.classEnrollment.findFirst({
+    where: {
+      studentProfileId: student.id,
+      schedule: { activeSessions: { some: { id: activeSessionId, status: 'ACTIVE' } } },
+    },
+  });
+  if (!enrollment) return res.status(403).json({ error: 'You are not enrolled in this active session.' });
+
+  const occupancies = await prisma.pcOccupancy.findMany({
+    where: { activeSessionId, timeReleased: null },
+    select: { pcNumber: true },
+  });
+  return res.json({ occupancies });
+}
+
+module.exports = { claimPc, releasePc, listBySession, getMyOccupancy, listAvailability };

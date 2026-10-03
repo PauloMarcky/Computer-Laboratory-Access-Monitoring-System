@@ -1,4 +1,14 @@
 import React from 'react';
+import {
+  BarChart3,
+  BookOpen,
+  CalendarDays,
+  ClipboardList,
+  GraduationCap,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Users,
+} from 'lucide-react';
 import type { WireframeScreenId } from '../../types';
 
 interface AdminSubNavProps {
@@ -7,83 +17,120 @@ interface AdminSubNavProps {
 }
 
 export const AdminSubNav: React.FC<AdminSubNavProps> = ({ activeScreen, onNavigate }) => {
+  const [isOpen, setIsOpen] = React.useState(() => (
+    window.sessionStorage.getItem('clams-admin-nav') !== 'closed'
+  ));
   const isSchedules =
     activeScreen === 'admin-schedule-module' ||
-    activeScreen === 'admin-schedule-add-module';
+    activeScreen === 'admin-schedule-add-module' ||
+    activeScreen === 'admin-schedule-roster';
   const isReports = activeScreen === 'admin-reports-dashboard';
   const isAnalytics = activeScreen === 'admin-students-analytics';
 
+  const itemClass = (isActive: boolean) =>
+    `flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold transition-colors ${isActive
+      ? 'bg-[#e8eef8] text-[#1b325f]'
+      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+    }`;
+  const closeNavigation = () => {
+    setIsOpen(false);
+    window.sessionStorage.setItem('clams-admin-nav', 'closed');
+  };
+  const openNavigation = () => {
+    setIsOpen(true);
+    window.sessionStorage.removeItem('clams-admin-nav');
+  };
+  const navigateAndClose = (screen: WireframeScreenId) => {
+    closeNavigation();
+    onNavigate(screen);
+  };
+
+  if (!isOpen) {
+    return (
+      <button
+        type="button"
+        onClick={openNavigation}
+        className="clams-sidebar-toggle no-print"
+        aria-label="Show administration navigation"
+        title="Show navigation"
+      >
+        <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+      </button>
+    );
+  }
+
   return (
-    <div className="bg-white border-b border-slate-200 px-6 no-print">
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-        <nav className="flex items-center gap-6 text-xs font-bold tracking-wider uppercase">
-          <button
-            type="button"
-            onClick={() => onNavigate('admin-schedule-module')}
-            className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${isSchedules
-                ? 'border-[#1b325f] text-[#1b325f]'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-          >
-            Schedules
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate('admin-subjects')}
-            className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${activeScreen === 'admin-subjects'
-                ? 'border-[#1b325f] text-[#1b325f]'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-          >
-            Subjects
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate('admin-reports-dashboard')}
-            className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${isReports
-                ? 'border-[#1b325f] text-[#1b325f]'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-          >
-            Class Reports
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate('admin-teacher-workload')}
-            className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${activeScreen === 'admin-teacher-workload'
-                ? 'border-[#1b325f] text-[#1b325f]'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-          >
-            Instructors Workload
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate('admin-students-analytics')}
-            className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${isAnalytics
-                ? 'border-[#1b325f] text-[#1b325f]'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-          >
-            Analytics Report
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate('admin-user-management')}
-            className={`py-3.5 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${activeScreen === 'admin-user-management'
-                ? 'border-[#1b325f] text-[#1b325f]'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-          >
-            User Management
-          </button>
-        </nav>
+    <aside className="clams-sidebar z-20 flex flex-col border border-slate-200 bg-white px-3 pb-4 pt-5 no-print">
+      <div className="mb-3 flex items-center justify-between gap-2 px-3">
+        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+          Administration
+        </div>
+        <button
+          type="button"
+          onClick={closeNavigation}
+          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          aria-label="Hide administration navigation"
+          title="Hide navigation"
+        >
+          <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+        </button>
       </div>
-    </div>
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+        <button
+          type="button"
+          onClick={() => navigateAndClose('admin-schedule-module')}
+          className={itemClass(isSchedules)}
+        >
+          <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Schedules
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigateAndClose('admin-subjects')}
+          className={itemClass(activeScreen === 'admin-subjects')}
+        >
+          <BookOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Subjects
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigateAndClose('admin-reports-dashboard')}
+          className={itemClass(isReports)}
+        >
+          <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Class Reports
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigateAndClose('admin-teacher-workload')}
+          className={itemClass(activeScreen === 'admin-teacher-workload')}
+        >
+          <GraduationCap className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Instructor Workload
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigateAndClose('admin-students-analytics')}
+          className={itemClass(isAnalytics)}
+        >
+          <BarChart3 className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Analytics Report
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigateAndClose('admin-user-management')}
+          className={itemClass(activeScreen === 'admin-user-management')}
+        >
+          <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
+          User Management
+        </button>
+
+      </nav>
+    </aside>
   );
 };

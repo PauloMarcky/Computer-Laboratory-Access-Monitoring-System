@@ -2,17 +2,17 @@ import React, { useState } from 'react';
 import { ClamsHeader } from '../../components/ClamsHeader';
 import { LabStaffSubNav } from '../../components/CustodianComponents/LabStaffSubNav';
 import { PCIssueRepairQueue } from '../../components/CustodianComponents/PCIssueRepairQueue';
-import type { ClassReportSubmission, PCIssueReport, WireframeScreenId } from '../../types';
+import type { ClassReportSubmission, PCIssueReport, PCIssueStatus, WireframeScreenId } from '../../types';
 
 interface LabStaffReportDetailProps {
   selectedReport?: ClassReportSubmission;
-  onUpdateReportStatus: (
+  onUpdateReportStatus?: (
     reportId: string,
     status: 'Pending' | 'Approved' | 'Rejected',
     remarks: string
-  ) => void;
+  ) => Promise<void>;
   pcIssueReports: PCIssueReport[];
-  onMarkPcIssueFixed: (reportId: string) => void;
+  onUpdatePcIssueStatus: (reportId: string, status: PCIssueStatus) => Promise<void>;
   onNavigate: (screen: WireframeScreenId) => void;
 }
 
@@ -20,20 +20,26 @@ export const LabStaffReportDetailView: React.FC<LabStaffReportDetailProps> = ({
   selectedReport,
   onUpdateReportStatus,
   pcIssueReports,
-  onMarkPcIssueFixed,
+  onUpdatePcIssueStatus,
   onNavigate,
 }) => {
   const [remarks, setRemarks] = useState(selectedReport?.remarks || '');
   const [feedbackBanner, setFeedbackBanner] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleDecision = (newStatus: 'Approved' | 'Rejected') => {
-    if (!selectedReport) return;
-    onUpdateReportStatus(selectedReport.id, newStatus, remarks);
-    setFeedbackBanner(
-      newStatus === 'Approved'
-        ? 'Report verified and approved. Official export document updated.'
-        : 'Report marked as rejected and returned to instructor for correction.'
-    );
+  const handleDecision = async (newStatus: 'Approved' | 'Rejected') => {
+    if (!selectedReport || !onUpdateReportStatus) return;
+    setBusy(true);
+    setError('');
+    try {
+      await onUpdateReportStatus(selectedReport.id, newStatus, remarks);
+      setFeedbackBanner(newStatus === 'Approved' ? 'Report verified and approved.' : 'Report marked as rejected.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to update this report.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (!selectedReport) {
@@ -43,7 +49,7 @@ export const LabStaffReportDetailView: React.FC<LabStaffReportDetailProps> = ({
         <LabStaffSubNav activeScreen="lab-staff-report-detail" onNavigate={onNavigate} />
         <main className="max-w-7xl mx-auto px-6 py-7">
           <p className="text-sm text-slate-500">No report selected.</p>
-          <PCIssueRepairQueue reports={pcIssueReports} onMarkFixed={onMarkPcIssueFixed} />
+          <PCIssueRepairQueue reports={pcIssueReports} onUpdateStatus={onUpdatePcIssueStatus} />
         </main>
       </div>
     );
@@ -206,7 +212,8 @@ export const LabStaffReportDetailView: React.FC<LabStaffReportDetailProps> = ({
             <div className="space-y-2.5 pt-1">
               <button
                 type="button"
-                onClick={() => handleDecision('Approved')}
+                disabled={busy}
+                onClick={() => void handleDecision('Approved')}
                 className="w-full py-2.5 px-4 rounded-lg bg-[#1b325f] hover:bg-[#142547] text-white text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
               >
                 Approve Report
@@ -214,7 +221,8 @@ export const LabStaffReportDetailView: React.FC<LabStaffReportDetailProps> = ({
 
               <button
                 type="button"
-                onClick={() => handleDecision('Rejected')}
+                disabled={busy}
+                onClick={() => void handleDecision('Rejected')}
                 className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
               >
                 Reject Report
@@ -226,9 +234,10 @@ export const LabStaffReportDetailView: React.FC<LabStaffReportDetailProps> = ({
                 {feedbackBanner}
               </div>
             )}
+            {error && <p className="text-xs text-rose-700">{error}</p>}
           </section>
         </div>
-        <PCIssueRepairQueue reports={pcIssueReports} onMarkFixed={onMarkPcIssueFixed} />
+        <PCIssueRepairQueue reports={pcIssueReports} onUpdateStatus={onUpdatePcIssueStatus} />
       </main>
     </div>
   );

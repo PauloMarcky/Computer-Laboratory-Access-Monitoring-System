@@ -13,10 +13,18 @@ const { isScheduleOpenNow } = require('../utils/schedule-match');
 //   4. that student is enrolled in THIS schedule (subject/section roster)
 async function scanImageForSchedule(req, res) {
   const scheduleId = toId(req.query.scheduleId);
-  if (!scheduleId) return res.status(400).json({ error: 'scheduleId is required.' });
+  const activeSessionId = toId(req.query.sessionId);
+  if (!scheduleId || !activeSessionId) {
+    return res.status(400).json({ error: 'scheduleId and sessionId are required.' });
+  }
 
   const schedule = await prisma.schedule.findUnique({ where: { scheduleId } });
   if (!schedule) return res.status(404).json({ error: 'Schedule not found.' });
+
+  const activeSession = await prisma.activeSession.findUnique({ where: { id: activeSessionId } });
+  if (!activeSession || activeSession.status !== 'ACTIVE' || activeSession.scheduleId !== scheduleId) {
+    return res.status(409).json({ error: 'The active session does not match this schedule.' });
+  }
 
   // 1. ownership
   if (req.user.role === 'INSTRUCTOR') {
@@ -76,17 +84,84 @@ async function scanImageForSchedule(req, res) {
     });
   }
 
+  const existingAttendance = await prisma.attendanceLog.findFirst({
+    where: { studentProfileId: student.id, activeSessionId },
+    orderBy: { timeIn: 'asc' },
+  });
+  const attendance = existingAttendance || await prisma.attendanceLog.create({
+    data: { studentProfileId: student.id, activeSessionId },
+  });
+
   return res.json({
     detected: true,
     matched: true,
+    alreadyLogged: Boolean(existingAttendance),
+    attendanceId: attendance.id,
     scannedId,
     studentId: scannedId,
     studentName,
     formalName,
     course: student.course || '',
     yearLevel: student.yearLevel != null ? String(student.yearLevel) : '',
-    timeIn: new Date().toISOString(),
+    timeIn: attendance.timeIn.toISOString(),
   });
 }
 
-module.exports = { scanImageForSchedule };
+async function manualTimeIn(req, res) {
+  const activeSessionId = toId(req.body?.activeSessionId);
+  const schoolId = String(req.body?.schoolId ?? '').trim();
+  if (!activeSessionId || !schoolId) {
+    return res.status(400).json({ error: 'activeSessionId and schoolId are required.' });
+  }
+
+  const session = await prisma.activeSession.findUnique({
+    where: { id: activeSessionId },
+    include: { schedule: true },
+  });
+  if (!session || session.status !== 'ACTIVE') {
+    return res.status(409).json({ error: 'Session is not active.' });
+  }
+  if (req.user.role === 'INSTRUCTOR') {
+    const profile = await getInstructorProfile(req.user.id);
+    if (!profile || profile.id !== session.schedule.instructorId) {
+      return res.status(403).json({ error: 'This is not your session.' });
+    }
+  }
+  if (!isScheduleOpenNow(session.schedule)) {
+    return res.status(409).json({ error: 'This class is outside its scheduled time.' });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { schoolId },
+    include: { studentProfile: true },
+  });
+  if (!user || user.role !== 'STUDENT' || !user.studentProfile) {
+    return res.status(404).json({ error: 'Student ID was not found.' });
+  }
+  const enrolled = await prisma.classEnrollment.findFirst({
+    where: { studentProfileId: user.studentProfile.id, scheduleId: session.scheduleId },
+  });
+  if (!enrolled) return res.status(403).json({ error: 'Student is not enrolled in this class.' });
+
+  const existingAttendance = await prisma.attendanceLog.findFirst({
+    where: { studentProfileId: user.studentProfile.id, activeSessionId },
+    orderBy: { timeIn: 'asc' },
+  });
+  const attendance = existingAttendance || await prisma.attendanceLog.create({
+    data: { studentProfileId: user.studentProfile.id, activeSessionId },
+  });
+  const student = user.studentProfile;
+
+  return res.status(existingAttendance ? 200 : 201).json({
+    alreadyLogged: Boolean(existingAttendance),
+    attendanceId: attendance.id,
+    studentId: user.schoolId,
+    studentName: `${student.firstName} ${student.lastName}`,
+    formalName: `${student.lastName}, ${student.firstName}`,
+    course: student.course || '',
+    yearLevel: student.yearLevel != null ? String(student.yearLevel) : '',
+    timeIn: attendance.timeIn.toISOString(),
+  });
+}
+
+module.exports = { scanImageForSchedule, manualTimeIn };

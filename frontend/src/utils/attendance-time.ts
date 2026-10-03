@@ -1,5 +1,18 @@
 import type { AttendanceEntry } from '../types';
 
+const SCHOOL_TIME_ZONE = import.meta.env.VITE_SCHOOL_TIME_ZONE || 'Asia/Manila';
+
+export function formatSchoolDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SCHOOL_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
 function timeToMinutes(time: string): number | null {
   const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (!match) return null;

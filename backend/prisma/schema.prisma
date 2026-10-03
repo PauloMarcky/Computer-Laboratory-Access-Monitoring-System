@@ -15,12 +15,13 @@ enum Role {
 }
 
 model User {
-  id        Int      @id @default(autoincrement()) @map("user_id")
-  schoolId  String   @unique @map("school_id")
-  password  String
-  role      Role     @default(STUDENT)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  id           Int      @id @default(autoincrement()) @map("user_id")
+  schoolId     String   @unique @map("school_id")
+  password     String
+  tokenVersion Int      @default(0) @map("token_version")
+  role         Role     @default(STUDENT)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
 
   studentProfile        StudentProfile?
   instructorProfile     InstructorProfile?
@@ -111,16 +112,19 @@ model ClassEnrollment {
   studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   schedule       Schedule       @relation(fields: [scheduleId], references: [scheduleId], onDelete: Cascade)
 
+  @@unique([studentProfileId, scheduleId])
   @@map("class_enrollment")
 }
 
 model ActiveSession {
-  id          Int       @id @default(autoincrement()) @map("active_session_id")
-  scheduleId  Int       @map("schedule_id")
-  sessionDate DateTime  @default(now()) @map("session_date")
-  startTime   DateTime  @default(now()) @map("start_time")
-  endTime     DateTime? @map("end_time")
-  status      String    @default("ACTIVE")
+  id            Int       @id @default(autoincrement()) @map("active_session_id")
+  scheduleId    Int       @map("schedule_id")
+  sessionDate   DateTime  @default(now()) @map("session_date")
+  startTime     DateTime  @default(now()) @map("start_time")
+  endTime       DateTime? @map("end_time")
+  status        String    @default("ACTIVE")
+  reportStatus  String    @default("PENDING") @map("report_status") @db.VarChar(20)
+  reportRemarks String?   @map("report_remarks") @db.Text
 
   schedule       Schedule        @relation(fields: [scheduleId], references: [scheduleId], onDelete: Cascade)
   attendanceLogs AttendanceLog[]
@@ -140,6 +144,7 @@ model AttendanceLog {
   studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   activeSession  ActiveSession  @relation(fields: [activeSessionId], references: [id], onDelete: Cascade)
 
+  @@unique([studentProfileId, activeSessionId])
   @@map("attendance_log")
 }
 
@@ -163,6 +168,7 @@ model PcIssueReport {
   studentProfileId Int      @map("student_profile_id")
   handledById      Int?     @map("handled_by_id")
   pcNumber         String   @map("pc_number")
+  category         String   @default("Other") @db.VarChar(50)
   issueDescription String   @map("issue_description") @db.Text
   status           String   @default("PENDING")
   staffNotes       String?  @map("staff_notes") @db.Text

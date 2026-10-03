@@ -24,6 +24,70 @@
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
+
+  .clams-sidebar~main {
+    margin-left: 14rem;
+  }
+
+  .clams-sidebar {
+    position: fixed;
+    top: 6rem;
+    left: 1.25rem;
+    width: 13rem;
+    height: min(22rem, calc(100vh - 7.5rem));
+    overflow-y: auto;
+    border-radius: 0.85rem;
+    box-shadow: 0 12px 28px rgb(15 23 42 / 0.1);
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+
+  .clams-sidebar-toggle {
+    position: fixed;
+    top: 6rem;
+    left: 1.25rem;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    color: #1b325f;
+    background: #ffffff;
+    box-shadow: 0 8px 20px rgb(15 23 42 / 0.12);
+  }
+
+  .clams-sidebar-toggle:hover {
+    background: #e8eef8;
+  }
+
+  .clams-sidebar::-webkit-scrollbar {
+    display: block;
+    width: 6px;
+  }
+
+  .clams-sidebar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+  }
+}
+
+@media (max-width: 900px) {
+  .clams-sidebar {
+    width: 12rem;
+    left: 0.75rem;
+    height: min(19rem, calc(100vh - 7rem));
+  }
+
+  .clams-sidebar-toggle {
+    left: 0.75rem;
+  }
+
+  .clams-sidebar~main {
+    margin-left: 12rem;
+  }
 }
 
 @media print {

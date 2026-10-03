@@ -4,6 +4,10 @@ const bcrypt = require('bcryptjs'); // change to 'bcrypt' if that's what your au
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Demo seed accounts are disabled in production.');
+  }
+
   // ---- 1. Admin ----
   const adminPassword = 'admin123';
   const admin = await prisma.user.upsert({
@@ -104,6 +108,24 @@ async function main() {
     });
   }
   console.log('✔ Subjects seeded:', subjectData.length);
+
+  // ---- 3b. Custodian ----
+  const custodianUser = await prisma.user.upsert({
+    where: { schoolId: 'CUST-001' },
+    update: {},
+    create: {
+      schoolId: 'CUST-001',
+      password: await bcrypt.hash('custodian123', 10),
+      role: 'CUSTODIAN',
+      custodianProfile: {
+        create: {
+          firstName: 'Carlos',
+          lastName: 'Mendoza',
+        },
+      },
+    },
+  });
+  console.log('✔ Custodian seeded:', custodianUser.schoolId, '(password: custodian123)');
 
   console.log('\nSeed complete.');
 }

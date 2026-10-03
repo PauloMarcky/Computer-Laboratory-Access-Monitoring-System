@@ -11,6 +11,7 @@ const FEEDBACK_MS = 2800; // how long the result overlay stays on screen
 interface CameraScannerProps {
   active: boolean;
   scheduleId: string; // the schedule the instructor verified; the server filters by its roster
+  activeSessionId: string;
   subject?: string;
   token: string; // instructor JWT
   // return 'duplicate' (+ original timeIn) if already logged, otherwise 'added'
@@ -24,6 +25,8 @@ export interface MatchedStudent {
   course?: string;
   yearLevel?: string;
   timeIn: string;
+  attendanceId?: number;
+  alreadyLogged?: boolean;
 }
 
 type Feedback = {
@@ -71,7 +74,7 @@ class ScannerBoundary extends React.Component<
 }
 
 /* ------------------------------------------------------------------ */
-const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, scheduleId, subject, token, onMatched }) => {
+const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, scheduleId, activeSessionId, subject, token, onMatched }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busyRef = useRef(false);
@@ -183,7 +186,7 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, scheduleId, 
         // Send the cropped frame to Express (OCR + student lookup happen there)
         let apiRes: Response;
         try {
-          apiRes = await fetch(`${SCAN_IMAGE_URL}?scheduleId=${encodeURIComponent(scheduleId)}`, {
+          apiRes = await fetch(`${SCAN_IMAGE_URL}?scheduleId=${encodeURIComponent(scheduleId)}&sessionId=${encodeURIComponent(activeSessionId)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'image/jpeg', Authorization: `Bearer ${token}` },
             body: blob,
@@ -253,6 +256,8 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, scheduleId, 
             course: data.course,
             yearLevel: data.yearLevel,
             timeIn: data.timeIn,
+            attendanceId: data.attendanceId,
+            alreadyLogged: data.alreadyLogged,
           };
           const outcome = onMatchedRef.current(student);
           const dup = outcome && outcome.result === 'duplicate';
@@ -295,7 +300,7 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, scheduleId, 
       <div className="w-full h-60 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 opacity-60 flex flex-col items-center justify-center">
         <CameraOff className="w-8 h-8 mb-2 text-slate-400" />
         <span className="text-[11px] text-slate-400">
-          Resume class session to enable scanning
+          {activeSessionId ? 'Resume class session to enable scanning' : 'Start a verified session to enable scanning'}
         </span>
       </div>
     );

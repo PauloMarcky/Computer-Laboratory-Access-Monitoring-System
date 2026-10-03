@@ -18,10 +18,10 @@ async function timeIn(req, res) {
   });
   if (!enrolled) return res.status(403).json({ error: 'You are not enrolled in this class.' });
 
-  const open = await prisma.attendanceLog.findFirst({
-    where: { studentProfileId: student.id, activeSessionId, timeOut: null },
+  const existing = await prisma.attendanceLog.findFirst({
+    where: { studentProfileId: student.id, activeSessionId },
   });
-  if (open) return res.status(409).json({ error: 'You are already timed in.' });
+  if (existing) return res.status(409).json({ error: 'Attendance is already recorded for this session.' });
 
   const log = await prisma.attendanceLog.create({ data: { studentProfileId: student.id, activeSessionId } });
   return res.status(201).json({ attendance: log });
@@ -68,7 +68,17 @@ async function listBySession(req, res) {
 
   const attendance = await prisma.attendanceLog.findMany({
     where: { activeSessionId },
-    include: { studentProfile: { select: { id: true, firstName: true, lastName: true, course: true } } },
+    include: {
+      studentProfile: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          course: true,
+          user: { select: { schoolId: true } },
+        },
+      },
+    },
     orderBy: { timeIn: 'asc' },
   });
   return res.json({ attendance });

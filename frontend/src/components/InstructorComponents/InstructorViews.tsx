@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { CheckCircle2, UserPlus, Play, Square } from 'lucide-react';
 import { ClamsHeader } from '../ClamsHeader';
-import { getAttendanceStatus, formatAttendanceTime } from '../../utils/attendance-time';
 import type { AttendanceEntry, ScheduleEntry, WireframeScreenId } from '../../types';
 
 interface InstructorAttendanceProps {
   attendance: AttendanceEntry[];
   schedule: ScheduleEntry | null;
   onScanStudent: (entry: AttendanceEntry) => void;
+  onManualStudent: (schoolId: string) => Promise<AttendanceEntry>;
+  onEndSession: () => Promise<void>;
   onNavigate: (screen: WireframeScreenId) => void;
-  sessionUnlocked: boolean;
-  onToggleSession: () => void;
+  onLogout?: () => void | Promise<void>;
   lastScannedName: string | null;
   onStudentLogged: (message: string) => void;
   scanner: React.ReactNode;
@@ -20,44 +20,60 @@ export const InstructorAttendanceView: React.FC<InstructorAttendanceProps> = ({
   attendance,
   schedule,
   onScanStudent,
+  onManualStudent,
+  onEndSession,
   onNavigate,
-  sessionUnlocked,
-  onToggleSession,
+  onLogout,
   lastScannedName,
   onStudentLogged,
   scanner,
 }) => {
   const [customId, setCustomId] = useState('');
-  const [customName, setCustomName] = useState('');
   const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualError, setManualError] = useState('');
+  const [manualBusy, setManualBusy] = useState(false);
+  const [endingSession, setEndingSession] = useState(false);
+  const [showEndConfirmation, setShowEndConfirmation] = useState(false);
 
-  const handleManualSubmit = (e: React.FormEvent) => {
+  const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customId.trim() || !customName.trim()) return;
-    const now = new Date();
-    const newEntry: AttendanceEntry = {
-      id: `att-${Date.now()}`,
-      timeIn: formatAttendanceTime(now),
-      studentId: customId.trim(),
-      name: customName.trim(),
-      formalName: customName.trim(),
-      pcNumber: 'None',
-      status: schedule
-        ? getAttendanceStatus(now, schedule.startTime, schedule.endTime)
-        : 'On-Time',
-    };
-    onScanStudent(newEntry);
-    onStudentLogged(`${newEntry.name} (${newEntry.studentId}) logged with no PC assigned`);
-    setCustomId('');
-    setCustomName('');
-    setShowManualEntry(false);
+    if (!customId.trim()) return;
+    setManualBusy(true);
+    setManualError('');
+    try {
+      const entry = await onManualStudent(customId.trim());
+      onScanStudent(entry);
+      onStudentLogged(`${entry.name} (${entry.studentId}) recorded`);
+      setCustomId('');
+      setShowManualEntry(false);
+    } catch (error) {
+      setManualError(error instanceof Error ? error.message : 'Unable to record attendance.');
+    } finally {
+      setManualBusy(false);
+    }
+  };
+
+  const handleEndSession = async () => {
+    setEndingSession(true);
+    setManualError('');
+    try {
+      await onEndSession();
+      onNavigate('instructor-attendance-export');
+    } catch (error) {
+      setManualError(error instanceof Error ? error.message : 'Unable to end the session.');
+    } finally {
+      setEndingSession(false);
+    }
   };
 
   return (
     <div className="min-h-[calc(100vh-44px)] bg-[#f4f6f9]">
       <ClamsHeader
         onNavigate={onNavigate}
-        statusLabel={sessionUnlocked ? 'Session Active' : 'Session Paused'}
+        onLogout={onLogout}
+        statusLabel="Session Active"
+        logoutTitle="End active session?"
+        logoutMessage="This class session will be ended automatically before you return to the role selection screen."
       />
 
       <main className="max-w-6xl mx-auto px-6 py-7 space-y-6">
@@ -65,50 +81,58 @@ export const InstructorAttendanceView: React.FC<InstructorAttendanceProps> = ({
         <section className="bg-white rounded-xl border border-slate-200/90 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <span
-                className={`w-2.5 h-2.5 rounded-full shrink-0 ${sessionUnlocked ? 'bg-emerald-500' : 'bg-amber-500'
-                  }`}
-              />
-              <h1 className="text-base font-bold text-slate-900">
-                {sessionUnlocked ? 'Active Lab Session Unlocked' : 'Lab Session Paused'}
-              </h1>
+              <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-emerald-500" />
+              <h1 className="text-base font-bold text-slate-900">Active Lab Session</h1>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              No active session data.
+              {schedule ? `${schedule.subject} · ${schedule.room} · ${schedule.day} ${schedule.startTime}–${schedule.endTime}` : 'Session details unavailable.'}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={onToggleSession}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer whitespace-nowrap ${sessionUnlocked
-                ? 'bg-rose-50/80 border-rose-200 text-rose-600 hover:bg-rose-100'
-                : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                }`}
-            >
-              {sessionUnlocked ? (
-                <>
-                  <Square className="w-3 h-3 fill-current" />
-                  <span>Stop Class</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3 h-3 fill-current" />
-                  <span>Resume Class</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onNavigate('instructor-attendance-export')}
+              onClick={() => setShowEndConfirmation(true)}
+              disabled={endingSession}
               className="px-4 py-2 rounded-lg bg-[#1b325f] hover:bg-[#142547] text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shadow-xs"
             >
-              End Session &amp; Export Log
+              {endingSession ? 'Ending session...' : 'End Session & Export Log'}
             </button>
           </div>
         </section>
+        {manualError && <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">{manualError}</p>}
+
+        {showEndConfirmation && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
+            <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
+              <h2 className="text-base font-bold text-slate-900">End this session?</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                This will close the active class session and open the attendance export page.
+              </p>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEndConfirmation(false)}
+                  className="rounded-md border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setShowEndConfirmation(false);
+                    await handleEndSession();
+                  }}
+                  disabled={endingSession}
+                  className="rounded-md bg-[#1b325f] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#142547] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {endingSession ? 'Ending...' : 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Main Two-Column Split */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -189,7 +213,7 @@ export const InstructorAttendanceView: React.FC<InstructorAttendanceProps> = ({
 
             {showManualEntry && (
               <form onSubmit={handleManualSubmit} className="mt-4 pt-4 border-t border-slate-100 space-y-3">
-                <div className="grid grid-cols-2 gap-2.5">
+                <div>
                   <div>
                     <label className="block text-[11px] font-medium text-slate-600 mb-1">
                       Student ID
@@ -202,24 +226,9 @@ export const InstructorAttendanceView: React.FC<InstructorAttendanceProps> = ({
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-[#1b325f] font-mono"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                      Student Full Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Enter student name"
-                      value={customName}
-                      onChange={(e) => setCustomName(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-[#1b325f]"
-                    />
-                  </div>
                 </div>
-                <button
-                  type="submit"
-                  className="w-full py-2 rounded-md bg-[#1b325f] hover:bg-[#142547] text-white text-xs font-semibold cursor-pointer"
-                >
-                  Log Student Attendance
+                <button type="submit" disabled={manualBusy} className="w-full py-2 rounded-md bg-[#1b325f] hover:bg-[#142547] text-white text-xs font-semibold cursor-pointer disabled:opacity-60">
+                  {manualBusy ? 'Checking student...' : 'Log Student Attendance'}
                 </button>
               </form>
             )}

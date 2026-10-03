@@ -1,25 +1,24 @@
 import React, { useState } from 'react';
-import { Calendar, SlidersHorizontal } from 'lucide-react';
+import { Calendar, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { ClamsHeader } from '../../components/ClamsHeader';
 import { AdminSubNav } from '../../components/AdminComponents/AdminSubNav';
 import type { ClassReportSubmission, WireframeScreenId } from '../../types';
+import { formatSchoolDate } from '../../utils/attendance-time';
 
 interface AdminReportsDashboardProps {
   reports: ClassReportSubmission[];
-  onSelectReport: (report: ClassReportSubmission) => void;
   onNavigate: (screen: WireframeScreenId) => void;
 }
 
 export const AdminReportsDashboardView: React.FC<AdminReportsDashboardProps> = ({
   reports,
-  onSelectReport,
   onNavigate,
 }) => {
   const [labFilter, setLabFilter] = useState('All Labs');
   const [subjectFilter, setSubjectFilter] = useState('All Subjects');
   const [instructorFilter, setInstructorFilter] = useState('All Instructors');
-  const [statusFilter, setStatusFilter] = useState('All Status');
   const [todayOnly, setTodayOnly] = useState(false);
+  const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
 
   const filteredReports = reports.filter((r) => {
     const matchesLab = labFilter === 'All Labs' || r.labRoom === labFilter;
@@ -27,10 +26,9 @@ export const AdminReportsDashboardView: React.FC<AdminReportsDashboardProps> = (
       subjectFilter === 'All Subjects' || r.subjectCode === subjectFilter;
     const matchesInstructor =
       instructorFilter === 'All Instructors' || r.instructor === instructorFilter;
-    const matchesStatus = statusFilter === 'All Status' || r.status === statusFilter;
-    const matchesDate = !todayOnly || r.date === new Date().toISOString().slice(0, 10);
+    const matchesDate = !todayOnly || r.date === formatSchoolDate(new Date());
     return (
-      matchesLab && matchesSubject && matchesInstructor && matchesStatus && matchesDate
+      matchesLab && matchesSubject && matchesInstructor && matchesDate
     );
   });
 
@@ -90,20 +88,6 @@ export const AdminReportsDashboardView: React.FC<AdminReportsDashboardProps> = (
             </select>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
-            <span className="text-slate-400">Status:</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
-            >
-              <option value="All Status">All Status</option>
-              <option value="Pending">Pending</option>
-              <option value="Approved">Approved</option>
-              <option value="Rejected">Rejected</option>
-            </select>
-          </div>
-
           <button
             type="button"
             onClick={() => setTodayOnly((v) => !v)}
@@ -130,8 +114,8 @@ export const AdminReportsDashboardView: React.FC<AdminReportsDashboardProps> = (
                   <th className="py-3.5 px-4">Lab Room</th>
                   <th className="py-3.5 px-4">Session Time</th>
                   <th className="py-3.5 px-4">Students</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 text-right">Action</th>
+                  <th className="py-3.5 px-4">Session Status</th>
+                  <th className="py-3.5 px-4 text-right">Attendance</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -142,16 +126,9 @@ export const AdminReportsDashboardView: React.FC<AdminReportsDashboardProps> = (
                     </td>
                   </tr>
                 )}
-                {filteredReports.map((rep) => {
-                  const badgeStyle =
-                    rep.status === 'Approved'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : rep.status === 'Pending'
-                        ? 'bg-amber-50 text-amber-700'
-                        : 'bg-rose-50 text-rose-700';
-
-                  return (
-                    <tr key={rep.id} className="hover:bg-slate-50/80 transition-colors">
+                {filteredReports.map((rep) => (
+                  <React.Fragment key={rep.id}>
+                    <tr className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-4 px-4 font-mono tabular-nums text-slate-500 whitespace-nowrap">
                         {rep.date}
                       </td>
@@ -175,26 +152,61 @@ export const AdminReportsDashboardView: React.FC<AdminReportsDashboardProps> = (
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap">
                         <span
-                          className={`inline-block px-2.5 py-0.5 rounded text-[11px] font-semibold ${badgeStyle}`}
+                          className="inline-block rounded bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700"
                         >
-                          {rep.status}
+                          Completed
                         </span>
                       </td>
                       <td className="py-4 px-4 text-right whitespace-nowrap">
                         <button
                           type="button"
-                          onClick={() => {
-                            onSelectReport(rep);
-                            onNavigate('lab-staff-report-detail');
-                          }}
-                          className="font-bold text-[#2563eb] hover:underline cursor-pointer"
+                          aria-expanded={expandedReportId === rep.id}
+                          onClick={() => setExpandedReportId((current) => current === rep.id ? null : rep.id)}
+                          className="inline-flex items-center gap-1.5 font-bold text-[#2563eb] hover:underline cursor-pointer"
                         >
-                          View
+                          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expandedReportId === rep.id ? 'rotate-180' : ''}`} />
+                          {expandedReportId === rep.id ? 'Hide Students' : 'View Students'}
                         </button>
                       </td>
                     </tr>
-                  );
-                })}
+                    {expandedReportId === rep.id && (
+                      <tr>
+                        <td colSpan={9} className="bg-slate-50 px-6 py-4">
+                          {rep.attendanceList.length === 0 ? (
+                            <p className="py-3 text-center text-xs text-slate-500">No students were recorded as present.</p>
+                          ) : (
+                            <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                              <table className="w-full border-collapse text-left text-xs">
+                                <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
+                                  <tr>
+                                    <th className="px-3 py-2.5">#</th>
+                                    <th className="px-3 py-2.5">Student ID</th>
+                                    <th className="px-3 py-2.5">Student Name</th>
+                                    <th className="px-3 py-2.5">Time In</th>
+                                    <th className="px-3 py-2.5">PC</th>
+                                    <th className="px-3 py-2.5">Attendance</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                  {rep.attendanceList.map((student, index) => (
+                                    <tr key={student.id}>
+                                      <td className="px-3 py-2.5 font-mono text-slate-500">{index + 1}</td>
+                                      <td className="px-3 py-2.5 font-mono text-slate-600">{student.studentId}</td>
+                                      <td className="px-3 py-2.5 font-semibold text-slate-800">{student.formalName}</td>
+                                      <td className="px-3 py-2.5 font-mono text-slate-600">{student.timeIn}</td>
+                                      <td className="px-3 py-2.5 font-mono text-slate-600">{student.pcNumber}</td>
+                                      <td className="px-3 py-2.5 text-slate-600">{student.status}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
               </tbody>
             </table>
           </div>
