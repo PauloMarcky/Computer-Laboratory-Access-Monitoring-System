@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FileSpreadsheet, KeyRound, Pencil, Save, Trash2, UserPlus, X } from 'lucide-react';
+import { Eye, EyeOff, FileSpreadsheet, KeyRound, Pencil, Save, Trash2, UserPlus, X } from 'lucide-react';
 import { readSheet } from 'read-excel-file/browser';
 import { ClamsHeader } from '../../components/ClamsHeader';
 import { AdminSubNav } from '../../components/AdminComponents/AdminSubNav';
@@ -29,6 +29,11 @@ interface StudentImportRow {
   errors: string[];
 }
 
+type PasswordUpdateFeedback = {
+  type: 'success' | 'error';
+  message: string;
+};
+
 const MAX_STUDENT_IMPORT_ROWS = 100;
 const normalizeHeader = (value: unknown) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const cellText = (value: unknown) => value == null ? '' : String(value).trim();
@@ -42,6 +47,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [lastName, setLastName] = useState('');
   const [schoolId, setSchoolId] = useState('');
   const [password, setPassword] = useState('');
+  const [showInitialPassword, setShowInitialPassword] = useState(false);
   const [department, setDepartment] = useState('');
   const [role, setRole] = useState<ManagedUserRole>('STUDENT');
   const [error, setError] = useState('');
@@ -52,7 +58,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPasswordId, setSavingPasswordId] = useState<number | null>(null);
+  const [passwordUpdateFeedback, setPasswordUpdateFeedback] = useState<PasswordUpdateFeedback | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [pendingDeleteUser, setPendingDeleteUser] = useState<ManagedUser | null>(null);
   const [editingNameId, setEditingNameId] = useState<number | null>(null);
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
@@ -92,6 +100,18 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     return () => { active = false; };
   }, [adminToken]);
 
+  useEffect(() => {
+    if (!passwordUpdateFeedback) return;
+    const timeoutId = window.setTimeout(() => setPasswordUpdateFeedback(null), 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [passwordUpdateFeedback]);
+
+  useEffect(() => {
+    if (!showInitialPassword) return;
+    const timeoutId = window.setTimeout(() => setShowInitialPassword(false), 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [showInitialPassword]);
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalizedSchoolId = schoolId.trim();
@@ -117,6 +137,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       setLastName('');
       setSchoolId('');
       setPassword('');
+      setShowInitialPassword(false);
       setDepartment('');
       setRole('STUDENT');
       setNotice(`${roleLabels[role]} account created and saved.`);
@@ -254,12 +275,15 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   };
 
   const handlePasswordUpdate = async (userId: number) => {
+    setError('');
+    setNotice('');
+    setPasswordUpdateFeedback(null);
     if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
+      setPasswordUpdateFeedback({ type: 'error', message: 'Password must be at least 8 characters.' });
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('The passwords do not match.');
+      setPasswordUpdateFeedback({ type: 'error', message: 'The passwords do not match.' });
       return;
     }
     setSavingPasswordId(userId);
@@ -276,30 +300,25 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       });
       const result = await readApiResponse<{ error?: string }>(response);
       if (!response.ok) throw new Error(result.error || 'Unable to update password.');
-      setNotice(`Password updated for ${users.find((user) => user.id === userId)?.schoolId}.`);
+      const updatedUser = users.find((user) => user.id === userId);
+      const updatedUserName = updatedUser?.fullName
+        || [updatedUser?.firstName, updatedUser?.lastName].filter(Boolean).join(' ')
+        || 'Name not on file';
+      setPasswordUpdateFeedback({ type: 'success', message: `Password updated for ${updatedUserName}.` });
       setEditingPasswordId(null);
       setNewPassword('');
       setConfirmPassword('');
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : 'Unable to update password.');
+      setPasswordUpdateFeedback({
+        type: 'error',
+        message: updateError instanceof Error ? updateError.message : 'Unable to update password.',
+      });
     } finally {
       setSavingPasswordId(null);
     }
   };
 
   const handleDeleteUser = async (user: ManagedUser) => {
-    const relatedDataWarning = user.role === 'STUDENT'
-      ? 'Their enrollments, attendance, PC occupancy, and reported PC issues will also be deleted.'
-      : user.role === 'INSTRUCTOR'
-        ? 'Their schedules, sessions, enrollments, attendance, and related PC records will also be deleted.'
-        : user.role === 'CUSTODIAN'
-          ? 'Their custodian profile will be deleted. Existing PC issue reports will remain without an assigned handler.'
-          : 'This administrator account will be permanently removed.';
-    const confirmed = window.confirm(
-      `Delete ${roleLabels[user.role].toLowerCase()} ${user.schoolId}? ${relatedDataWarning} This cannot be undone.`
-    );
-    if (!confirmed) return;
-
     setDeletingUserId(user.id);
     setError('');
     setNotice('');
@@ -308,14 +327,17 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         method: 'DELETE',
         headers: { Authorization: `Bearer ${adminToken}` },
       });
-      const result = await readApiResponse<{ error?: string }>(response);
-      if (!response.ok) throw new Error(result.error || 'Unable to delete user.');
+      if (!response.ok) {
+        const result = await readApiResponse<{ error?: string }>(response);
+        throw new Error(result.error || 'Unable to delete user.');
+      }
       setUsers((current) => current.filter((item) => item.id !== user.id));
       if (editingPasswordId === user.id) {
         setEditingPasswordId(null);
         setNewPassword('');
         setConfirmPassword('');
       }
+      setPendingDeleteUser(null);
       setNotice(`${roleLabels[user.role]} account ${user.schoolId} deleted.`);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete user.');
@@ -323,6 +345,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       setDeletingUserId(null);
     }
   };
+
+  const pendingDeleteWarning = pendingDeleteUser?.role === 'STUDENT'
+    ? 'Their enrollments, attendance, PC occupancy, and reported PC issues will also be deleted.'
+    : pendingDeleteUser?.role === 'INSTRUCTOR'
+      ? 'Their schedules, sessions, enrollments, attendance, and related PC records will also be deleted.'
+      : pendingDeleteUser?.role === 'CUSTODIAN'
+        ? 'Their custodian profile will be deleted. Existing PC issue reports will remain without an assigned handler.'
+        : 'This administrator account will be permanently removed.';
 
   const beginNameEdit = (user: ManagedUser) => {
     setEditingNameId(user.id);
@@ -386,6 +416,29 @@ export const UserManagement: React.FC<UserManagementProps> = ({
           <h1 className="text-xl font-bold text-slate-900">User Management</h1>
           <p className="mt-1 text-xs text-slate-500">Add accounts, manage passwords, and remove user accounts.</p>
         </header>
+
+        {!pendingDeleteUser && error && (
+          <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </p>
+        )}
+        {passwordUpdateFeedback && (
+          <p
+            role={passwordUpdateFeedback.type === 'error' ? 'alert' : 'status'}
+            className={`rounded-md border px-4 py-3 text-sm ${
+              passwordUpdateFeedback.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+            }`}
+          >
+            {passwordUpdateFeedback.message}
+          </p>
+        )}
+        {notice && (
+          <p role="status" className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {notice}
+          </p>
+        )}
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.6fr)]">
           <form
@@ -457,7 +510,28 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
                 <label className="block text-xs font-semibold text-slate-700">
                   Initial password
-                  <input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm font-normal text-slate-900 focus:border-[#1b325f] focus:outline-none" />
+                  <span className="relative mt-1.5 block">
+                    <input
+                      required
+                      minLength={8}
+                      type={showInitialPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      autoComplete="new-password"
+                      className="w-full rounded-md border border-slate-300 px-3 py-2.5 pr-10 text-sm font-normal text-slate-900 focus:border-[#1b325f] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowInitialPassword((visible) => !visible)}
+                      aria-label={showInitialPassword ? 'Hide initial password' : 'Show initial password'}
+                      aria-pressed={showInitialPassword}
+                      className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-800"
+                    >
+                      {showInitialPassword
+                        ? <EyeOff className="h-4 w-4" aria-hidden="true" />
+                        : <Eye className="h-4 w-4" aria-hidden="true" />}
+                    </button>
+                  </span>
                 </label>
 
                 <button
@@ -638,7 +712,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => void handleDeleteUser(user)}
+                                    onClick={() => { setPendingDeleteUser(user); setError(''); setNotice(''); }}
                                     disabled={user.isCurrentUser || deletingUserId === user.id}
                                     title={user.isCurrentUser ? 'You cannot delete the signed-in administrator' : 'Delete user account'}
                                     aria-label={`Delete ${user.schoolId}`}
@@ -673,6 +747,45 @@ export const UserManagement: React.FC<UserManagementProps> = ({
           </section>
         </div>
       </main>
+
+      {pendingDeleteUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-user-title"
+            aria-describedby="delete-user-description"
+            className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-xl"
+          >
+            <h2 id="delete-user-title" className="text-base font-bold text-slate-900">
+              Delete {roleLabels[pendingDeleteUser.role].toLowerCase()} {pendingDeleteUser.schoolId}?
+            </h2>
+            <p id="delete-user-description" className="mt-2 text-sm leading-6 text-slate-600">
+              {pendingDeleteWarning} This cannot be undone.
+            </p>
+            {error && <p role="alert" className="mt-3 text-xs font-medium text-rose-700">{error}</p>}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setPendingDeleteUser(null); setError(''); }}
+                disabled={deletingUserId === pendingDeleteUser.id}
+                className="rounded-md border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteUser(pendingDeleteUser)}
+                disabled={deletingUserId === pendingDeleteUser.id}
+                className="inline-flex items-center gap-1.5 rounded-md bg-rose-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-rose-800 disabled:cursor-wait disabled:opacity-60"
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                {deletingUserId === pendingDeleteUser.id ? 'Deleting...' : 'Delete user'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 };

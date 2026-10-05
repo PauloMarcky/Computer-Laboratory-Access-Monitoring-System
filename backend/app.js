@@ -25,13 +25,6 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '100kb' }));
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  message: { error: 'Too many sign-in attempts. Try again later.' },
-});
 const scanLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   limit: 900,
@@ -42,7 +35,6 @@ const scanLimiter = rateLimit({
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-app.use('/api/users/login', loginLimiter);
 app.use('/api/attendance/scan-image', scanLimiter);
 app.use('/api/users', require('./routes/user-routes'));
 app.use('/api/students', require('./routes/student-routes'));

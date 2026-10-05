@@ -32,6 +32,8 @@ export const SubjectManagerView: React.FC<Props> = ({ token, onNavigate }) => {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ code: '', title: '', yearLevel: 1 as number | null });
   const [saving, setSaving] = useState(false);
+  const [pendingDeleteSubject, setPendingDeleteSubject] = useState<Subject | null>(null);
+  const [deletingSubjectId, setDeletingSubjectId] = useState<number | null>(null);
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
@@ -81,10 +83,20 @@ export const SubjectManagerView: React.FC<Props> = ({ token, onNavigate }) => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this subject?')) return;
-    const res = await fetch(`${API_BASE_URL}/subjects/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) setSubjects((prev) => prev.filter((s) => s.id !== id));
+  const handleDelete = async (subject: Subject) => {
+    setDeletingSubjectId(subject.id);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/subjects/${subject.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      const data = await readApiResponse<{ error?: string }>(res);
+      if (!res.ok) throw new Error(data.error || 'Unable to delete subject.');
+      setSubjects((prev) => prev.filter((item) => item.id !== subject.id));
+      setPendingDeleteSubject(null);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete subject.');
+    } finally {
+      setDeletingSubjectId(null);
+    }
   };
 
   return (
@@ -130,7 +142,7 @@ export const SubjectManagerView: React.FC<Props> = ({ token, onNavigate }) => {
                   <td className="py-3 px-4 text-slate-600">{s.yearLevel ?? '—'}</td>
                   <td className="py-3 px-5 text-right">
                     <button onClick={() => openEdit(s)} className="p-1.5 hover:bg-slate-100 rounded cursor-pointer"><Pencil className="w-3.5 h-3.5 text-slate-500" /></button>
-                    <button onClick={() => handleDelete(s.id)} className="p-1.5 hover:bg-rose-50 rounded cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-rose-500" /></button>
+                    <button onClick={() => { setPendingDeleteSubject(s); setError(''); }} aria-label={`Delete subject ${s.code}`} className="p-1.5 hover:bg-rose-50 rounded cursor-pointer"><Trash2 className="w-3.5 h-3.5 text-rose-500" /></button>
                   </td>
                 </tr>
               ))}
@@ -167,6 +179,23 @@ export const SubjectManagerView: React.FC<Props> = ({ token, onNavigate }) => {
                 </button>
               </div>
             </form>
+          </div>
+        )}
+
+        {pendingDeleteSubject && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 px-4 py-6">
+            <section role="dialog" aria-modal="true" aria-labelledby="delete-subject-title" aria-describedby="delete-subject-description" className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-xl">
+              <h2 id="delete-subject-title" className="text-base font-bold text-slate-900">Delete subject {pendingDeleteSubject.code}?</h2>
+              <p id="delete-subject-description" className="mt-2 text-sm leading-6 text-slate-600">This will permanently remove {pendingDeleteSubject.title} from the subject catalog.</p>
+              {error && <p role="alert" className="mt-3 text-xs font-medium text-rose-700">{error}</p>}
+              <div className="mt-6 flex justify-end gap-2">
+                <button type="button" onClick={() => { setPendingDeleteSubject(null); setError(''); }} disabled={deletingSubjectId === pendingDeleteSubject.id} className="rounded-md border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={() => void handleDelete(pendingDeleteSubject)} disabled={deletingSubjectId === pendingDeleteSubject.id} className="inline-flex items-center gap-1.5 rounded-md bg-rose-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-rose-800 disabled:cursor-wait disabled:opacity-60">
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {deletingSubjectId === pendingDeleteSubject.id ? 'Deleting...' : 'Delete subject'}
+                </button>
+              </div>
+            </section>
           </div>
         )}
       </main>
