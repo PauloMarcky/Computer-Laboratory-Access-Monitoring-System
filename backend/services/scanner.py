@@ -28,12 +28,12 @@ elif os.name == "nt":
 TESSERACT_CONFIG = r"--psm 11 -c tessedit_char_whitelist=0123456789-"
 
 # Student ID format: 2 digits, hyphen, 5 digits  ->  24-10326
-ID_PATTERN = re.compile(r"(?<!\d)(\d{2})\s*[-\u2013\u2014]?\s*(\d{5})(?!\d)")
+ID_PATTERN = re.compile(r"(?<!\d)(\d{2})-(\d{5})(?!\d)")
 
 
 def normalize_id(raw_text: str):
     """Returns NN-NNNNN (e.g. 24-10326) or None.
-    Accepts 24-10326, 24 10326 and 2410326 (missing hyphen)."""
+    Requires two digits, an ASCII hyphen, and five digits with no spaces."""
     m = ID_PATTERN.search(raw_text)
     if not m:
         return None

@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
 const { toId } = require('../utils/helpers');
-const { validateStudentImportRows } = require('../utils/student-import');
+const { normalizeStudentYearLevel, validateStudentImportRows } = require('../utils/student-import');
 
 const creatableRoles = new Set(['STUDENT', 'INSTRUCTOR', 'CUSTODIAN']);
 
@@ -137,6 +137,13 @@ async function createUser(req, res) {
     return res.status(400).json({ error: 'firstName and lastName are required.' });
   }
 
+  if (role === 'STUDENT') {
+    const normalizedYearLevel = normalizeStudentYearLevel(yearLevel);
+    if (normalizedYearLevel === null) {
+      return res.status(400).json({ error: 'yearLevel is required and must be between 1 and 4 for student accounts.' });
+    }
+  }
+
   const hashedPassword = await bcrypt.hash(password, 12);
   try {
     let user;
@@ -146,7 +153,7 @@ async function createUser(req, res) {
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           course: typeof course === 'string' && course.trim() ? course.trim() : null,
-          yearLevel: yearLevel ? Number(yearLevel) : null,
+          yearLevel: normalizeStudentYearLevel(yearLevel),
           user: {
             create: { schoolId: schoolId.trim(), password: hashedPassword, role },
           },

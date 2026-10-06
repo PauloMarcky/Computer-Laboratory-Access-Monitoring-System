@@ -1,4 +1,4 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export async function readApiResponse<T>(response: Response): Promise<T> {
 	if (!response.headers.get('content-type')?.includes('application/json')) {

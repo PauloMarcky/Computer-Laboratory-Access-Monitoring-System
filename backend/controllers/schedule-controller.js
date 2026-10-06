@@ -29,6 +29,17 @@ function toApiSchedule(s) {
   };
 }
 
+function normalizeScheduleEnd(start, end) {
+  const startMinutes = start.getUTCHours() * 60 + start.getUTCMinutes();
+  const endMinutes = end.getUTCHours() * 60 + end.getUTCMinutes();
+  if (startMinutes === endMinutes) return null;
+
+  const normalizedEnd = new Date(start);
+  normalizedEnd.setUTCHours(end.getUTCHours(), end.getUTCMinutes(), 0, 0);
+  if (endMinutes < startMinutes) normalizedEnd.setUTCDate(normalizedEnd.getUTCDate() + 1);
+  return normalizedEnd;
+}
+
 async function createSchedule(req, res) {
   const {
     instructorId, labRoomId, subjectCode, dayOfWeek,
@@ -44,9 +55,11 @@ async function createSchedule(req, res) {
   if (!DAYS.includes(String(dayOfWeek).toUpperCase())) {
     return res.status(400).json({ error: `dayOfWeek must be one of ${DAYS.join(', ')}.` });
   }
-  if (!start || !end || end <= start) {
-    return res.status(400).json({ error: 'Valid startTime and endTime are required; end must be after start.' });
+  if (!start || !end) {
+    return res.status(400).json({ error: 'Valid startTime and endTime are required.' });
   }
+  const normalizedEnd = normalizeScheduleEnd(start, end);
+  if (!normalizedEnd) return res.status(400).json({ error: 'Start and end times cannot be the same.' });
 
   const day = String(dayOfWeek).toUpperCase();
   const data = {
@@ -55,7 +68,7 @@ async function createSchedule(req, res) {
     subjectCode: subjectCode.trim(),
     dayOfWeek: day,
     startTime: start,
-    endTime: end,
+    endTime: normalizedEnd,
     termId: toId(termId) || null,
     section: typeof section === 'string' && section.trim() ? section.trim() : 'A',
     yearLevel: yearLevel != null ? Number(yearLevel) : 1,
@@ -65,7 +78,7 @@ async function createSchedule(req, res) {
     const outcome = await prisma.$transaction(async (tx) => {
       const candidates = await tx.schedule.findMany({
         where: {
-          dayOfWeek: day,
+          dayOfWeek: { in: [DAYS[(DAYS.indexOf(day) + DAYS.length - 1) % DAYS.length], day, DAYS[(DAYS.indexOf(day) + 1) % DAYS.length]] },
           termId: data.termId,
           OR: [{ labRoomId: data.labRoomId }, { instructorId: data.instructorId }],
         },
@@ -184,13 +197,16 @@ async function updateSchedule(req, res) {
   }
 
   const candidate = { ...current, ...data };
-  if (candidate.endTime <= candidate.startTime) return res.status(400).json({ error: 'endTime must be after startTime.' });
+  const normalizedEnd = normalizeScheduleEnd(candidate.startTime, candidate.endTime);
+  if (!normalizedEnd) return res.status(400).json({ error: 'Start and end times cannot be the same.' });
+  candidate.endTime = normalizedEnd;
+  if (startTime !== undefined || endTime !== undefined) data.endTime = normalizedEnd;
   try {
     const outcome = await prisma.$transaction(async (tx) => {
       const candidates = await tx.schedule.findMany({
         where: {
           scheduleId: { not: id },
-          dayOfWeek: candidate.dayOfWeek,
+          dayOfWeek: { in: [DAYS[(DAYS.indexOf(candidate.dayOfWeek) + DAYS.length - 1) % DAYS.length], candidate.dayOfWeek, DAYS[(DAYS.indexOf(candidate.dayOfWeek) + 1) % DAYS.length]] },
           termId: candidate.termId,
           OR: [{ labRoomId: candidate.labRoomId }, { instructorId: candidate.instructorId }],
         },

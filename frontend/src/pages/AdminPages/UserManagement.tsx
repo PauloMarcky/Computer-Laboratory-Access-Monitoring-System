@@ -49,6 +49,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [password, setPassword] = useState('');
   const [showInitialPassword, setShowInitialPassword] = useState(false);
   const [department, setDepartment] = useState('');
+  const [studentYearLevel, setStudentYearLevel] = useState<number | ''>('');
   const [role, setRole] = useState<ManagedUserRole>('STUDENT');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -119,6 +120,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       setError('A user with this school ID already exists.');
       return;
     }
+    if (role === 'STUDENT' && (!studentYearLevel || Number(studentYearLevel) < 1 || Number(studentYearLevel) > 4)) {
+      setError('Student year level is required and must be between 1 and 4.');
+      return;
+    }
     setIsAdding(true);
     setError('');
     setNotice('');
@@ -129,7 +134,15 @@ export const UserManagement: React.FC<UserManagementProps> = ({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${adminToken}`,
         },
-        body: JSON.stringify({ schoolId: normalizedSchoolId, password, role, firstName, lastName, department }),
+        body: JSON.stringify({
+          schoolId: normalizedSchoolId,
+          password,
+          role,
+          firstName,
+          lastName,
+          department,
+          yearLevel: role === 'STUDENT' ? Number(studentYearLevel) : undefined,
+        }),
       });
       const result = await readApiResponse<{ error?: string }>(response);
       if (!response.ok) throw new Error(result.error || 'Unable to add user.');
@@ -139,6 +152,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       setPassword('');
       setShowInitialPassword(false);
       setDepartment('');
+      setStudentYearLevel('');
       setRole('STUDENT');
       setNotice(`${roleLabels[role]} account created and saved.`);
       try {
@@ -425,11 +439,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         {passwordUpdateFeedback && (
           <p
             role={passwordUpdateFeedback.type === 'error' ? 'alert' : 'status'}
-            className={`rounded-md border px-4 py-3 text-sm ${
-              passwordUpdateFeedback.type === 'error'
+            className={`rounded-md border px-4 py-3 text-sm ${passwordUpdateFeedback.type === 'error'
                 ? 'border-rose-200 bg-rose-50 text-rose-700'
                 : 'border-emerald-200 bg-emerald-50 text-emerald-800'
-            }`}
+              }`}
           >
             {passwordUpdateFeedback.message}
           </p>
@@ -499,7 +512,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                   Role
                   <select
                     value={role}
-                    onChange={(event) => setRole(event.target.value as ManagedUserRole)}
+                    onChange={(event) => {
+                      setRole(event.target.value as ManagedUserRole);
+                      if (event.target.value !== 'STUDENT') setStudentYearLevel('');
+                    }}
                     className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 focus:border-[#1b325f] focus:outline-none"
                   >
                     <option value="STUDENT">Student</option>
@@ -507,6 +523,24 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                     <option value="CUSTODIAN">Custodian</option>
                   </select>
                 </label>
+
+                {role === 'STUDENT' && (
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Year level
+                    <select
+                      required
+                      value={studentYearLevel}
+                      onChange={(event) => setStudentYearLevel(event.target.value ? Number(event.target.value) : '')}
+                      className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 focus:border-[#1b325f] focus:outline-none"
+                    >
+                      <option value="">Select year</option>
+                      <option value="1">1st Year</option>
+                      <option value="2">2nd Year</option>
+                      <option value="3">3rd Year</option>
+                      <option value="4">4th Year</option>
+                    </select>
+                  </label>
+                )}
 
                 <label className="block text-xs font-semibold text-slate-700">
                   Initial password

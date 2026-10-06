@@ -4,9 +4,9 @@ import { API_BASE_URL } from '../../api';
 
 // Express runs OCR (Python worker), then only accepts students enrolled in this schedule
 const SCAN_IMAGE_URL = `${API_BASE_URL}/attendance/scan-image`;
-const SCAN_INTERVAL_MS = 700;
-const COOLDOWN_MS = 4000; // don't re-scan the same ID immediately
-const FEEDBACK_MS = 2800; // how long the result overlay stays on screen
+const SCAN_INTERVAL_MS = 450;
+const COOLDOWN_MS = 2500; // don't re-scan the same ID immediately
+const FEEDBACK_MS = 1400; // how long the result overlay stays on screen
 
 interface CameraScannerProps {
   active: boolean;
@@ -121,7 +121,7 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, scheduleId, 
     let cancelled = false;
 
     navigator.mediaDevices
-      .getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
+      .getUserMedia({ video: { width: { ideal: 960 }, height: { ideal: 540 } }, audio: false })
       .then((s) => {
         if (cancelled) {
           s.getTracks().forEach((t) => t.stop());
@@ -179,7 +179,7 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, scheduleId, 
         canvas.getContext('2d')!.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
 
         const blob: Blob | null = await new Promise((res) =>
-          canvas.toBlob(res, 'image/jpeg', 0.85)
+          canvas.toBlob(res, 'image/jpeg', 0.68)
         );
         if (!blob) return;
 

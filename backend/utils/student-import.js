@@ -1,5 +1,12 @@
 const MAX_STUDENT_IMPORT_ROWS = 100;
 
+function normalizeStudentYearLevel(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 4) return null;
+  return parsed;
+}
+
 function validateStudentImportRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return { students: [], errors: ['The spreadsheet has no student rows.'] };
@@ -24,7 +31,7 @@ function validateStudentImportRows(rows) {
     const lastName = typeof row.lastName === 'string' ? row.lastName.trim() : '';
     const password = typeof row.password === 'string' ? row.password : '';
     const course = typeof row.course === 'string' ? row.course.trim() : '';
-    const yearLevelValue = row.yearLevel == null || row.yearLevel === '' ? null : Number(row.yearLevel);
+    const yearLevelValue = normalizeStudentYearLevel(row.yearLevel);
     const rowErrors = [];
 
     if (!schoolId) rowErrors.push('School ID is required');
@@ -54,4 +61,4 @@ function validateStudentImportRows(rows) {
   return errors.length ? { students: [], errors } : { students, errors: [] };
 }
 
-module.exports = { MAX_STUDENT_IMPORT_ROWS, validateStudentImportRows };
+module.exports = { MAX_STUDENT_IMPORT_ROWS, normalizeStudentYearLevel, validateStudentImportRows };

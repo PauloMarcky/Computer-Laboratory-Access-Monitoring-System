@@ -9,7 +9,7 @@ if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGINS) {
   throw new Error('CORS_ORIGINS must be configured in production.');
 }
 const allowedOrigins = new Set(
-  (process.env.CORS_ORIGINS || 'http://localhost:3001,http://127.0.0.1:3001')
+  (process.env.CORS_ORIGINS || 'http://localhost:3001,http://127.0.0.1:3001,http://10.35.225.159:3001')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),

@@ -6,6 +6,7 @@
 
 const TIME_ZONE = process.env.APP_TIME_ZONE || 'Asia/Manila';
 const EARLY_GRACE_MIN = Number(process.env.SCHEDULE_EARLY_GRACE_MIN ?? 15);
+const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
 function nowInSchoolTime(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -39,9 +40,17 @@ const minutesOfDay = (d) => d.getUTCHours() * 60 + d.getUTCMinutes();
 function getAttendanceStatus(timeIn, schedule) {
   const start = minutesOfDay(new Date(schedule.startTime));
   const end = minutesOfDay(new Date(schedule.endTime));
-  if (end <= start) return 'On-Time';
-  const lateAfter = start + (end - start) * 0.25;
-  return schoolTimeMinutes(new Date(timeIn)) >= lateAfter ? 'Late' : 'On-Time';
+  const current = schoolTimeMinutes(new Date(timeIn));
+  if (end > start) {
+    const lateAfter = start + (end - start) * 0.25;
+    return current >= lateAfter ? 'Late' : 'On-Time';
+  }
+
+  const duration = 24 * 60 - start + end;
+  const elapsed = current >= start
+    ? current - start
+    : current < end ? 24 * 60 - start + current : -1;
+  return elapsed >= duration * 0.25 ? 'Late' : 'On-Time';
 }
 
 function formatSchoolDate(date) {
@@ -68,10 +77,17 @@ function formatSchoolTime(date) {
 // [start - early grace, end).
 function isScheduleOpenNow(schedule, date = new Date()) {
   const { day, minutes } = nowInSchoolTime(date);
-  if (String(schedule.dayOfWeek).toUpperCase() !== day) return false;
+  const scheduleDay = String(schedule.dayOfWeek).toUpperCase();
+  const dayIndex = DAYS.indexOf(scheduleDay);
+  if (dayIndex < 0) return false;
   const start = minutesOfDay(new Date(schedule.startTime));
   const end = minutesOfDay(new Date(schedule.endTime));
-  return minutes >= start - EARLY_GRACE_MIN && minutes < end;
+  if (day === scheduleDay) {
+    return minutes >= start - EARLY_GRACE_MIN && (end <= start || minutes < end);
+  }
+
+  const nextDay = DAYS[(dayIndex + 1) % DAYS.length];
+  return end < start && day === nextDay && minutes < end;
 }
 
 module.exports = {

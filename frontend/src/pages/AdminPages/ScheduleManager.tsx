@@ -644,7 +644,6 @@ export const AdminScheduleAddView: React.FC<AdminScheduleAddProps> = ({
               <input
                 type="time"
                 required
-                min={startTime}
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white font-mono tabular-nums text-slate-800 font-medium focus:outline-none focus:border-[#1b325f]"

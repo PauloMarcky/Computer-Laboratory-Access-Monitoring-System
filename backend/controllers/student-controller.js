@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/db');
 const { toId } = require('../utils/helpers');
+const { normalizeStudentYearLevel } = require('../utils/student-import');
 
 const include = { user: { select: { id: true, schoolId: true, role: true } } };
 
@@ -12,12 +13,17 @@ async function createStudent(req, res) {
   }
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
 
+  const normalizedYearLevel = normalizeStudentYearLevel(yearLevel);
+  if (normalizedYearLevel === null) {
+    return res.status(400).json({ error: 'yearLevel is required and must be between 1 and 4 for student accounts.' });
+  }
+
   const student = await prisma.studentProfile.create({
     data: {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       course: course || null,
-      yearLevel: yearLevel ? Number(yearLevel) : null,
+      yearLevel: normalizedYearLevel,
       user: {
         create: { schoolId: schoolId.trim(), password: await bcrypt.hash(password, 12), role: 'STUDENT' },
       },
