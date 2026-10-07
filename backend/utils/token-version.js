@@ -1,6 +1,7 @@
 function isCurrentTokenVersion(tokenVersion, currentVersion) {
   const version = Number(tokenVersion ?? 0);
-  return Number.isSafeInteger(version) && version === currentVersion;
+  const current = Number(currentVersion ?? 0);
+  return Number.isSafeInteger(version) && Number.isSafeInteger(current) && version === current;
 }
 
 module.exports = { isCurrentTokenVersion };

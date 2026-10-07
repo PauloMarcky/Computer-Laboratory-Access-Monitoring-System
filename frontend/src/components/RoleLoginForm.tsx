@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import { ArrowLeft, LogIn } from 'lucide-react';
 import type { WireframeScreenId } from '../types';
+import { ArrowLeft } from 'lucide-react';
 
 interface RoleLoginFormProps {
   onNavigate: (screen: WireframeScreenId) => void;
@@ -62,57 +62,81 @@ export const RoleLoginForm = ({
   };
 
   return (
-    <main className="min-h-[calc(100vh-44px)] bg-[#f4f6f9] flex flex-col items-center justify-center p-6">
-      <section className="w-full max-w-[420px] rounded-xl border border-slate-200 bg-white px-8 py-9 shadow-sm">
-        <button
-          type="button"
-          onClick={() => onNavigate('login-portal')}
-          className="mb-7 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900 "
-          aria-label="Back"
-        >
-          <ArrowLeft size={16} aria-hidden="true" />
-          Back
-        </button>
+    <main className="relative min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden bg-white-100/80">
 
-        <h1 className="text-2xl font-bold text-slate-900 text-center">{role} Log in</h1>
-        <p className="mt-2 mb-7 text-sm leading-6 text-slate-500 text-center">{description}</p>
+      {/* Modal card */}
+      <section className="animate-pop-in relative z-10 w-full max-w-[520px] overflow-hidden rounded-2xl border-3 border-white/40 outline-none  bg-white shadow-2xl shadow-purple-950/60 [backface-visibility:hidden] [transform:translateZ(0)]">
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <label className="block text-sm font-medium text-slate-700">
-            {identityLabel}
-            <input
-              type={identityType}
-              name="username"
-              autoComplete="username"
-              placeholder={identityPlaceholder}
-              required
-              className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#1d3663] focus:ring-2 focus:ring-[#1d3663]/15"
-            />
-          </label>
-
-          <label className="block text-sm font-medium text-slate-700">
-            Password
-            <input
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              placeholder="Enter your password"
-              required
-              className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#1d3663] focus:ring-2 focus:ring-[#1d3663]/15"
-            />
-          </label>
-
-          {submitError && <p role="alert" className="text-sm text-rose-700">{submitError}</p>}
+        {/* Header strip */}
+        <div className="relative border-0 bg-[#1b325f] px-10 pt-8 pb-10">
 
           <button
-            type="submit"
-            disabled={isSubmitting}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1d3663] disabled:cursor-wait disabled:opacity-70"
+            type="button"
+            onClick={() => onNavigate('login-portal')}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-purple-100 ring-1 ring-white/20 transition-colors hover:bg-white/20 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
+            aria-label="Back"
           >
-            <LogIn size={16} aria-hidden="true" />
-            {isSubmitting ? 'Signing in...' : 'Continue'}
+            <ArrowLeft size={18} aria-hidden="true" />
           </button>
-        </form>
+
+          <div className="relative text-center">
+            <h1 className="mt-4 text-3xl font-bold tracking-tight text-white">
+              Welcome back
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-purple-100/80">{description}</p>
+          </div>
+        </div>
+
+        {/* Form body */}
+        <div className="px-10 py-9">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <label className="block text-sm font-semibold tracking-wide text-slate-700">
+              {identityLabel}
+              <input
+                type={identityType}
+                name="username"
+                autoComplete="username"
+                placeholder={identityPlaceholder}
+                required
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50/60 px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-600 focus:bg-white focus:ring-4 focus:ring-purple-600/15"
+              />
+            </label>
+
+            <label className="block text-sm font-semibold tracking-wide text-slate-700">
+              Password
+              <input
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                placeholder="Enter your password"
+                required
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50/60 px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-600 focus:bg-white focus:ring-4 focus:ring-purple-600/15"
+              />
+            </label>
+
+            {submitError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+              >
+                <span className="mt-0.5 inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-rose-500" />
+                {submitError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full rounded-lg bg-gradient-to-r from-purple-700 to-violet-700 px-4 py-3.5 text-base font-semibold text-white shadow-lg shadow-purple-900/30 transition-all hover:from-purple-800 hover:to-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 disabled:cursor-wait disabled:opacity-70"
+            >
+              {isSubmitting ? 'Signing in...' : 'Continue'}
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-xs text-slate-400">
+            University of La Salette - Santiago City, Isabela
+          </p>
+        </div>
       </section>
     </main>
   );

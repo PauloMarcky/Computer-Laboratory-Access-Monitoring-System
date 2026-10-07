@@ -51,6 +51,7 @@ app.use('/api/pc-issues', require('./routes/pc-issue-routes'));
 app.use('/api/scanner', require('./routes/scanner-routes'));
 app.use('/api/subjects', require('./routes/subject-routes'));
 app.use('/api/terms', require('./routes/term-routes'));
+app.use('/api/analytics', require('./routes/analytics-routes'));
 
 app.use(notFound);
 app.use(errorHandler);

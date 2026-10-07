@@ -12,8 +12,8 @@ export const LabStaffSubNav: React.FC<LabStaffSubNavProps> = ({ activeScreen, on
     window.sessionStorage.getItem('clams-custodian-nav') !== 'closed'
   ));
   const isReports = activeScreen === 'lab-staff-report-detail';
-  const isUsageRecords = activeScreen === 'lab-staff-records-module';
   const isLabRoomUsage = activeScreen === 'lab-staff-rooms-module';
+  const isUsageHistory = activeScreen === 'lab-staff-usage-history';
   const isExport = activeScreen === 'lab-staff-report-export';
 
   const itemClass = (isActive: boolean) =>
@@ -76,21 +76,22 @@ export const LabStaffSubNav: React.FC<LabStaffSubNavProps> = ({ activeScreen, on
 
         <button
           type="button"
-          onClick={() => navigateAndClose('lab-staff-records-module')}
-          className={itemClass(isUsageRecords)}
-        >
-          <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />
-          Usage Records
-        </button>
-
-        <button
-          type="button"
           onClick={() => navigateAndClose('lab-staff-rooms-module')}
           className={itemClass(isLabRoomUsage)}
         >
           <Monitor className="h-4 w-4 shrink-0" aria-hidden="true" />
           Lab Room Usage
         </button>
+
+        <button
+          type="button"
+          onClick={() => navigateAndClose('lab-staff-usage-history')}
+          className={itemClass(isUsageHistory)}
+        >
+          <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Laboratory Usages
+        </button>
+
         <button
           type="button"
           onClick={() => navigateAndClose('lab-staff-report-export')}

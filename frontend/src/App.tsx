@@ -29,10 +29,11 @@ import { InstructorSessionVerificationPage } from './pages/InstructorPages/Instr
 import { ExportAttendancePage } from './pages/InstructorPages/ExportAttendancePage';
 import { StudentClaimPCView } from './pages/StudentPages/PCAssignment';
 import { StudentReportIssueView } from './pages/StudentPages/PCFeedbackReport';
-import { LabStaffReportDetailView } from './pages/CustodianPages.tsx/ComputerReport';
-import { LabStaffReportExportView } from './pages/CustodianPages.tsx/ExportReport';
-import { LabStaffRecordsView, LabStaffRoomsView } from './pages/CustodianPages.tsx/LaboratoriesActivity';
-import { AdminScheduleAddView, AdminScheduleModuleView } from './pages/AdminPages/ScheduleManager';
+import { LabStaffReportDetailView } from './pages/CustodianPages/ComputerReport';
+import { LabStaffReportExportView } from './pages/CustodianPages/ExportReport';
+import { LabStaffRecordsView, LabStaffRoomsView } from './pages/CustodianPages/LaboratoriesActivity';
+import { LabStaffUsageHistoryView } from './pages/CustodianPages/LaboratoryUsages';
+import { AdminScheduleModuleView } from './pages/AdminPages/ScheduleManager';
 import { AdminTeacherWorkloadView } from './pages/AdminPages/InstructorWorkload';
 import { AdminReportsDashboardView } from './pages/AdminPages/ClassReports';
 import { AdminStudentsAnalyticsView } from './pages/AdminPages/AnalyticsReport';
@@ -274,12 +275,12 @@ const WIREFRAME_SCREENS: Array<{
       label: '9. lab-staff-rooms-module',
       roleGroup: 'Lab Staff',
     },
-    { id: 'admin-schedule-module', label: '10. admin-schedule-module', roleGroup: 'Admin' },
     {
-      id: 'admin-schedule-add-module',
-      label: '11. admin-schedule-add-module',
-      roleGroup: 'Admin',
+      id: 'lab-staff-usage-history',
+      label: '9b. lab-staff-usage-history',
+      roleGroup: 'Lab Staff',
     },
+    { id: 'admin-schedule-module', label: '10. admin-schedule-module', roleGroup: 'Admin' },
     {
       id: 'admin-teacher-workload',
       label: '12. admin-teacher-workload',
@@ -333,8 +334,9 @@ const screenPaths: Record<WireframeScreenId, string> = {
   'lab-staff-report-export': '/custodian/pc-issues/export',
   'lab-staff-records-module': '/custodian/usage-records',
   'lab-staff-rooms-module': '/custodian/lab-rooms',
+  'lab-staff-usage-history': '/custodian/laboratory-usages',
   'admin-schedule-module': '/admin/schedules',
-  'admin-schedule-add-module': '/admin/schedules/edit',
+  'admin-schedule-add-module': '/admin/schedules/new',
   'admin-schedule-roster': '/admin/schedules/roster',
   'admin-subjects': '/admin/subjects',
   'admin-teacher-workload': '/admin/instructor-workload',
@@ -401,7 +403,6 @@ export default function App() {
   // Admin Schedule State
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [activeInstructorSchedule, setActiveInstructorSchedule] = useState<ScheduleEntry | null>(null);
-  const [editingSchedule, setEditingSchedule] = useState<ScheduleEntry | null>(null);
   const [rosterSchedule, setRosterSchedule] = useState<ScheduleEntry | null>(getInitialRosterSchedule);
   const [adminToken, setAdminToken] = useState(
     () => localStorage.getItem('clams.adminToken') || ''
@@ -458,14 +459,17 @@ export default function App() {
         const response = role === 'ADMIN'
           ? await fetch(`${API_BASE_URL}/sessions/reports`, { headers })
           : await fetch(`${API_BASE_URL}/pc-issues`, { headers });
-        if (response.status === 401 || response.status === 403) {
+        const historyResponse = role === 'CUSTODIAN'
+          ? await fetch(`${API_BASE_URL}/sessions/reports`, { headers })
+          : null;
+        if ([response, historyResponse].some((item) => item && (item.status === 401 || item.status === 403))) {
           localStorage.removeItem(roleTokenStorageKeys[role]);
           if (role === 'ADMIN') setAdminToken('');
           else setCustodianToken('');
           setCurrentScreen('login-portal');
           return;
         }
-        if (!response.ok) throw new Error('Unable to restore role data.');
+        if (!response.ok || (historyResponse && !historyResponse.ok)) throw new Error('Unable to restore role data.');
         if (!active) return;
         if (role === 'ADMIN') {
           const result = await readApiResponse<{ error?: string; reports: ClassReportSubmission[] }>(response);
@@ -473,8 +477,9 @@ export default function App() {
           setPcIssueReports([]);
         } else {
           const result = await readApiResponse<{ error?: string; reports: ApiPcIssue[] }>(response);
+          const history = await readApiResponse<{ error?: string; reports: ClassReportSubmission[] }>(historyResponse!);
           setPcIssueReports(result.reports.map(mapApiPcIssue));
-          setClassReports([]);
+          setClassReports(history.reports);
         }
       } catch (error) {
         if (active) console.warn('Unable to restore role data.', error);
@@ -837,13 +842,17 @@ export default function App() {
     }
 
     if (expectedRole === 'CUSTODIAN') {
-      const response = await fetch(`${API_BASE_URL}/pc-issues`, {
-        headers: { Authorization: `Bearer ${result.token}` },
-      });
-      const data = await readApiResponse<{ error?: string; reports: ApiPcIssue[] }>(response);
-      if (!response.ok) throw new Error(data.error || 'Unable to load PC issue reports.');
-      setPcIssueReports(data.reports.map(mapApiPcIssue));
-      setClassReports([]);
+      const headers = { Authorization: `Bearer ${result.token}` };
+      const [issuesResponse, reportsResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/pc-issues`, { headers }),
+        fetch(`${API_BASE_URL}/sessions/reports`, { headers }),
+      ]);
+      const issuesData = await readApiResponse<{ error?: string; reports: ApiPcIssue[] }>(issuesResponse);
+      const reportsData = await readApiResponse<{ error?: string; reports: ClassReportSubmission[] }>(reportsResponse);
+      if (!issuesResponse.ok) throw new Error(issuesData.error || 'Unable to load PC issue reports.');
+      if (!reportsResponse.ok) throw new Error(reportsData.error || 'Unable to load class session history.');
+      setPcIssueReports(issuesData.reports.map(mapApiPcIssue));
+      setClassReports(reportsData.reports);
     }
 
     if (expectedRole === 'ADMIN') {
@@ -1217,35 +1226,6 @@ export default function App() {
     setPcIssueReports((previous) => previous.map((item) => item.id === reportId ? mapApiPcIssue(result.report) : item));
   };
 
-  const handleEditSchedule = (entry: ScheduleEntry) => {
-    setEditingSchedule(entry);
-    setCurrentScreen('admin-schedule-add-module');
-  };
-
-  const handleCreateNewSchedule = (
-    day: ScheduleEntry['day'] = 'Mon',
-    startTime = '02:00 PM'
-  ) => {
-    setEditingSchedule({
-      id: '',
-      instructorId: 0,
-      labRoomId: 0,
-      day,
-      startTime,
-      endTime: addTwoHours(startTime),
-      subject: '',
-      teacher: '',
-      room: '',
-      department: '',
-      semester: '',
-      colorTheme: 'blue',
-      termId: null,
-      section: 'A',
-      yearLevel: 1,
-    } as ScheduleEntry);
-    setCurrentScreen('admin-schedule-add-module');
-  };
-
   const handleSaveSchedule = async (entry: ScheduleEntry) => {
     const isUpdate = /^\d+$/.test(entry.id) && Number(entry.id) > 0;
     const dayOfWeek = shortDayToApi[entry.day];
@@ -1439,28 +1419,25 @@ export default function App() {
           />
         )}
 
-        {currentScreen === 'admin-schedule-module' && (
-          <AdminScheduleModuleView
-            schedules={schedules}
-            onEditSchedule={handleEditSchedule}
-            onCreateNewSchedule={handleCreateNewSchedule}
-            onDeleteAllSchedules={handleDeleteAllSchedules}
-            isLoading={isLoadingSchedules}
-            error={scheduleError}
+        {currentScreen === 'lab-staff-usage-history' && (
+          <LabStaffUsageHistoryView
+            records={mapClassReportsToUsageRecords(classReports)}
             onNavigate={setCurrentScreen}
           />
         )}
 
-        {currentScreen === 'admin-schedule-add-module' && (
-          <AdminScheduleAddView
-            editingSchedule={editingSchedule}
+        {currentScreen === 'admin-schedule-module' && (
+          <AdminScheduleModuleView
+            schedules={schedules}
             instructors={scheduleInstructors}
             labRooms={scheduleLabRooms}
-            error={scheduleError}
             token={adminToken}
             onSaveSchedule={handleSaveSchedule}
             onDeleteSchedule={handleDeleteSchedule}
+            onDeleteAllSchedules={handleDeleteAllSchedules}
             onManageRoster={handleManageRoster}
+            isLoading={isLoadingSchedules}
+            error={scheduleError}
             onNavigate={setCurrentScreen}
           />
         )}
@@ -1480,7 +1457,7 @@ export default function App() {
         )}
 
         {currentScreen === 'admin-students-analytics' && (
-          <AdminStudentsAnalyticsView onNavigate={setCurrentScreen} />
+          <AdminStudentsAnalyticsView token={adminToken} onNavigate={setCurrentScreen} />
         )}
 
         {currentScreen === 'admin-user-management' && (

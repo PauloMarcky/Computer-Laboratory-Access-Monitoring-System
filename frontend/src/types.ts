@@ -1,19 +1,25 @@
 export type WireframeScreenId =
+  // Portal / login
   | 'login-portal'
   | 'instructor-login'
   | 'lab-staff-login'
   | 'student-login'
   | 'admin-login'
+  // Instructor
   | 'instructor-session-verification'
   | 'instructor-attendance-module'
   | 'instructor-attendance-export'
+  // Student
   | 'student-claim-pc'
-  | 'student-report-history'
+  | 'student-report-history'          // ← NEW
   | 'student-report-issue'
+  // Lab staff / Custodian
   | 'lab-staff-report-detail'
   | 'lab-staff-report-export'
   | 'lab-staff-records-module'
   | 'lab-staff-rooms-module'
+  | 'lab-staff-usage-history'         // ← NEW
+  // Admin
   | 'admin-schedule-module'
   | 'admin-schedule-add-module'
   | 'admin-schedule-roster'

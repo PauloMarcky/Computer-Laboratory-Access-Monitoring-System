@@ -55,14 +55,10 @@ export const ClamsHeader: React.FC<ClamsHeaderProps> = ({
 
         {/* Zone 3: Active Lab Status & Portal Switcher */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#243f75] border border-white/10 text-xs text-slate-100 whitespace-nowrap">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-            <span>{statusLabel}</span>
-          </div>
           <button
             type="button"
             onClick={handleLogout}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-slate-200 hover:text-white hover:bg-white/10 transition-colors whitespace-nowrap"
+            className=" flex items-center gap-2 px-3 py-1.5 rounded-md bg-amber-600 border border-white/10 text-xs text-slate-100 whitespace-nowrapinline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-slate-200 hover:text-white hover:bg-amber-700 transition-colors whitespace-nowrap"
             title="Switch Access Level"
           >
             <LogOut className="w-3.5 h-3.5" />

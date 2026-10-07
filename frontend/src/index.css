@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@theme {
+  --animate-pop-in: pop-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
 @layer base {
   * {
     scrollbar-width: none;
@@ -25,16 +29,21 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .clams-sidebar~main {
-    margin-left: 14rem;
+  /* Sidebar + main sit side-by-side inside this wrapper */
+  .clams-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    padding: 1.5rem;
   }
 
+  /* Sidebar is now in normal flow and sticks while scrolling */
   .clams-sidebar {
-    position: fixed;
-    top: 6rem;
-    left: 1.25rem;
-    width: 13rem;
-    height: min(22rem, calc(100vh - 7.5rem));
+    position: sticky;
+    top: 1.5rem;
+    flex-shrink: 0;
+    width: 16rem;
+    max-height: calc(100vh - 3rem);
     overflow-y: auto;
     border-radius: 0.85rem;
     box-shadow: 0 12px 28px rgb(15 23 42 / 0.1);
@@ -42,10 +51,17 @@
     scrollbar-color: #cbd5e1 transparent;
   }
 
+  /* Main takes the remaining width */
+  .clams-layout>main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* The small floating toggle when sidebar is collapsed */
   .clams-sidebar-toggle {
-    position: fixed;
-    top: 6rem;
-    left: 1.25rem;
+    position: sticky;
+    top: 1.5rem;
+    flex-shrink: 0;
     z-index: 20;
     display: inline-flex;
     align-items: center;
@@ -75,18 +91,14 @@
 }
 
 @media (max-width: 900px) {
+  .clams-layout {
+    gap: 1rem;
+    padding: 1rem;
+  }
+
   .clams-sidebar {
-    width: 12rem;
-    left: 0.75rem;
-    height: min(19rem, calc(100vh - 7rem));
-  }
-
-  .clams-sidebar-toggle {
-    left: 0.75rem;
-  }
-
-  .clams-sidebar~main {
-    margin-left: 12rem;
+    width: 14rem;
+    max-height: calc(100vh - 2rem);
   }
 }
 
@@ -98,4 +110,32 @@
   body {
     background-color: #ffffff !important;
   }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes admin-sidebar-slide-in {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.admin-sidebar-slide-in {
+  animation: admin-sidebar-slide-in 0.2s ease-out;
 }

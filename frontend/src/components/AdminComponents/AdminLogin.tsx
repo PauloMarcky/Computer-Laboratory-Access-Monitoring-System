@@ -6,15 +6,17 @@ interface AdminLoginProps extends RoleLoginProps {
 }
 
 export const AdminLogin = ({ onNavigate, onAdminLogin }: AdminLoginProps) => (
-  <RoleLoginForm
-    onNavigate={onNavigate}
-    role="Administrator"
-    description="Log in with administrator account"
-    identityLabel="Administrator ID"
-    identityPlaceholder="Enter your ID number"
-    identityType="text"
-    destination="admin-schedule-module"
-    accent="text-[#15223b]"
-    onCredentialsSubmit={onAdminLogin}
-  />
+  <div className="animate-pop-in">
+    <RoleLoginForm
+      onNavigate={onNavigate}
+      role="Administrator"
+      description="Log in with administrator account"
+      identityLabel="Administrator ID"
+      identityPlaceholder="Enter your ID number"
+      identityType="text"
+      destination="admin-schedule-module"
+      accent="text-[#15223b]"
+      onCredentialsSubmit={onAdminLogin}
+    />
+  </div>
 );
