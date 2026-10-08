@@ -7,6 +7,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', a(c.listLabRooms));
+router.get('/status', a(c.getLabRoomStatus)); // ← must be before /:id
 router.get('/:id', a(c.getLabRoom));
 router.post('/', authorize('ADMIN'), a(c.createLabRoom));
 router.patch('/:id', authorize('ADMIN'), a(c.updateLabRoom));

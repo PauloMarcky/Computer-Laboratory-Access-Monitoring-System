@@ -127,7 +127,7 @@ export const RoleLoginForm = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-lg bg-gradient-to-r from-purple-700 to-violet-700 px-4 py-3.5 text-base font-semibold text-white shadow-lg shadow-purple-900/30 transition-all hover:from-purple-800 hover:to-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 disabled:cursor-wait disabled:opacity-70"
+              className="w-full rounded-lg bg-amber-600 px-4 py-3.5 text-base font-semibold text-white shadow-lg shadow-purple-900/30 transition-all hover:from-purple-800 hover:to-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 disabled:cursor-wait disabled:opacity-70"
             >
               {isSubmitting ? 'Signing in...' : 'Continue'}
             </button>

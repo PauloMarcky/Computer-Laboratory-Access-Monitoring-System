@@ -78,7 +78,7 @@ export const RoleSelectionPage = ({
                   type="button"
                   onClick={() => handleNavigate('instructor-login')}
                   disabled={!!loadingTarget}
-                  className="w-full rounded-lg bg-[#1b325f] px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-purple-900/20 transition-all hover:bg-[#1b325f]/90 hover:shadow-lg hover:shadow-purple-900/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-lg bg-[#2563eb] px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-purple-900/20 transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-purple-900/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Instructor Console
                 </button>
@@ -87,7 +87,7 @@ export const RoleSelectionPage = ({
                   type="button"
                   onClick={() => handleNavigate('student-login')}
                   disabled={!!loadingTarget}
-                  className="w-full rounded-lg bg-[#1b325f] px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-purple-900/20 transition-all hover:bg-[#1b325f]/90 hover:shadow-lg hover:shadow-purple-900/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-lg bg-[#2563eb] px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-purple-900/20 transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-purple-900/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Student Seat Claim
                 </button>
@@ -96,7 +96,7 @@ export const RoleSelectionPage = ({
                   type="button"
                   onClick={() => handleNavigate('lab-staff-login')}
                   disabled={!!loadingTarget}
-                  className="w-full rounded-lg bg-[#1b325f] px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-purple-900/20 transition-all hover:bg-[#1b325f]/90 hover:shadow-lg hover:shadow-purple-900/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-lg bg-[#2563eb] px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-purple-900/20 transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-purple-900/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Custodian Portal
                 </button>
@@ -105,7 +105,7 @@ export const RoleSelectionPage = ({
                   type="button"
                   onClick={() => handleNavigate('admin-login')}
                   disabled={!!loadingTarget}
-                  className="w-full rounded-lg bg-[#1b325f] px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-purple-900/20 transition-all hover:bg-[#1b325f]/90 hover:shadow-lg hover:shadow-purple-900/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-lg bg-[#2563eb] px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-purple-900/20 transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-purple-900/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Administrator Portal
                 </button>

@@ -9,6 +9,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AttendanceEntry,
   ClassReportSubmission,
+  LabRoomStatus,
   LabUsageRecord,
   PCIssueReport,
   PCIssueStatus,
@@ -31,8 +32,7 @@ import { StudentClaimPCView } from './pages/StudentPages/PCAssignment';
 import { StudentReportIssueView } from './pages/StudentPages/PCFeedbackReport';
 import { LabStaffReportDetailView } from './pages/CustodianPages/ComputerReport';
 import { LabStaffReportExportView } from './pages/CustodianPages/ExportReport';
-import { LabStaffRecordsView, LabStaffRoomsView } from './pages/CustodianPages/LaboratoriesActivity';
-import { LabStaffUsageHistoryView } from './pages/CustodianPages/LaboratoryUsages';
+import { LabStaffUsagePage } from './pages/CustodianPages/LaboratoryUsages';
 import { AdminScheduleModuleView } from './pages/AdminPages/ScheduleManager';
 import { AdminTeacherWorkloadView } from './pages/AdminPages/InstructorWorkload';
 import { AdminReportsDashboardView } from './pages/AdminPages/ClassReports';
@@ -425,6 +425,7 @@ export default function App() {
   const [scheduleLabRooms, setScheduleLabRooms] = useState<ScheduleLabRoomOption[]>([]);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
   const [scheduleError, setScheduleError] = useState('');
+  const [labRooms, setLabRooms] = useState<LabRoomStatus[]>([]);
 
   useEffect(() => {
     localStorage.setItem(LAST_SCREEN_STORAGE_KEY, currentScreen);
@@ -744,6 +745,37 @@ export default function App() {
     void loadScheduleData();
     return () => { active = false; };
   }, [adminToken]);
+
+  useEffect(() => {
+    const isOnLabUsage =
+      currentScreen === 'lab-staff-rooms-module' ||
+      currentScreen === 'lab-staff-usage-history';
+
+    if (!custodianToken || !isOnLabUsage) return;
+
+    let active = true;
+
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/lab-rooms/status`, {
+          headers: { Authorization: `Bearer ${custodianToken}` },
+        });
+        if (!res.ok) return;
+        const data = await readApiResponse<{ rooms: LabRoomStatus[] }>(res);
+        if (active) setLabRooms(data.rooms ?? []);
+      } catch {
+        /* silent — keep last known rooms */
+      }
+    };
+
+    void load();
+    const interval = window.setInterval(load, 15000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [custodianToken, currentScreen]);
 
   const handleAdminLogin = async (schoolId: string, password: string) => {
     await handleRoleLogin('ADMIN', schoolId, password);
@@ -1405,23 +1437,14 @@ export default function App() {
           />
         )}
 
-        {currentScreen === 'lab-staff-records-module' && (
-          <LabStaffRecordsView
+        {(currentScreen === 'lab-staff-rooms-module' || currentScreen === 'lab-staff-usage-history') && (
+          <LabStaffUsagePage
             records={mapClassReportsToUsageRecords(classReports)}
-            onNavigate={setCurrentScreen}
-          />
-        )}
-
-        {currentScreen === 'lab-staff-rooms-module' && (
-          <LabStaffRoomsView
-            rooms={[]}
-            onNavigate={setCurrentScreen}
-          />
-        )}
-
-        {currentScreen === 'lab-staff-usage-history' && (
-          <LabStaffUsageHistoryView
-            records={mapClassReportsToUsageRecords(classReports)}
+            rooms={labRooms}
+            activeTab={currentScreen === 'lab-staff-usage-history' ? 'history' : 'rooms'}
+            onTabChange={(tab) =>
+              setCurrentScreen(tab === 'history' ? 'lab-staff-usage-history' : 'lab-staff-rooms-module')
+            }
             onNavigate={setCurrentScreen}
           />
         )}

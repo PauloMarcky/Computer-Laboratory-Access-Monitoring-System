@@ -1,5 +1,5 @@
 import React from 'react';
-import { ClipboardList, Download, FileWarning, Monitor, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ClipboardList, Download, FileWarning, Menu, Monitor, X } from 'lucide-react';
 import type { WireframeScreenId } from '../../types';
 
 interface LabStaffSubNavProps {
@@ -9,29 +9,36 @@ interface LabStaffSubNavProps {
 
 export const LabStaffSubNav: React.FC<LabStaffSubNavProps> = ({ activeScreen, onNavigate }) => {
   const [isOpen, setIsOpen] = React.useState(() => (
-    window.sessionStorage.getItem('clams-custodian-nav') !== 'closed'
+    window.sessionStorage.getItem('clams-custodian-nav') === 'open'
   ));
+  const [justOpened, setJustOpened] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!justOpened) return;
+    const timer = window.setTimeout(() => setJustOpened(false), 320);
+    return () => window.clearTimeout(timer);
+  }, [justOpened]);
+
   const isReports = activeScreen === 'lab-staff-report-detail';
-  const isLabRoomUsage = activeScreen === 'lab-staff-rooms-module';
-  const isUsageHistory = activeScreen === 'lab-staff-usage-history';
   const isExport = activeScreen === 'lab-staff-report-export';
+  const isLabUsage =
+    activeScreen === 'lab-staff-rooms-module' || activeScreen === 'lab-staff-usage-history';
 
   const itemClass = (isActive: boolean) =>
-    `flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold transition-colors ${isActive
+    `flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-semibold transition-colors ${isActive
       ? 'bg-[#e8eef8] text-[#1b325f]'
       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
     }`;
+
+  const openNavigation = () => {
+    setJustOpened(true);
+    setIsOpen(true);
+    window.sessionStorage.setItem('clams-custodian-nav', 'open');
+  };
+
   const closeNavigation = () => {
     setIsOpen(false);
     window.sessionStorage.setItem('clams-custodian-nav', 'closed');
-  };
-  const openNavigation = () => {
-    setIsOpen(true);
-    window.sessionStorage.removeItem('clams-custodian-nav');
-  };
-  const navigateAndClose = (screen: WireframeScreenId) => {
-    closeNavigation();
-    onNavigate(screen);
   };
 
   if (!isOpen) {
@@ -43,16 +50,19 @@ export const LabStaffSubNav: React.FC<LabStaffSubNavProps> = ({ activeScreen, on
         aria-label="Show laboratory operations navigation"
         title="Show navigation"
       >
-        <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+        <Menu className="h-5 w-5" aria-hidden="true" />
       </button>
     );
   }
 
   return (
-    <aside className="clams-sidebar z-20 flex flex-col border border-slate-200 bg-white px-3 pb-4 pt-5 no-print">
-      <div className="mb-3 flex items-center justify-between gap-2 px-3">
-        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-          Laboratory Operations
+    <aside
+      className={`clams-sidebar z-20 flex flex-col border border-slate-200 bg-white px-4 pb-5 pt-6 no-print ${justOpened ? 'admin-sidebar-slide-in' : ''
+        }`}
+    >
+      <div className="mb-4 flex items-center justify-between gap-2 px-3">
+        <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+          Laboratory Ops
         </div>
         <button
           type="button"
@@ -61,13 +71,14 @@ export const LabStaffSubNav: React.FC<LabStaffSubNavProps> = ({ activeScreen, on
           aria-label="Hide laboratory operations navigation"
           title="Hide navigation"
         >
-          <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+          <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
-      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+
+      <nav className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
         <button
           type="button"
-          onClick={() => navigateAndClose('lab-staff-report-detail')}
+          onClick={() => onNavigate('lab-staff-report-detail')}
           className={itemClass(isReports)}
         >
           <FileWarning className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -76,25 +87,16 @@ export const LabStaffSubNav: React.FC<LabStaffSubNavProps> = ({ activeScreen, on
 
         <button
           type="button"
-          onClick={() => navigateAndClose('lab-staff-rooms-module')}
-          className={itemClass(isLabRoomUsage)}
+          onClick={() => onNavigate('lab-staff-rooms-module')}
+          className={itemClass(isLabUsage)}
         >
           <Monitor className="h-4 w-4 shrink-0" aria-hidden="true" />
-          Lab Room Usage
+          Laboratory Usage
         </button>
 
         <button
           type="button"
-          onClick={() => navigateAndClose('lab-staff-usage-history')}
-          className={itemClass(isUsageHistory)}
-        >
-          <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />
-          Laboratory Usages
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigateAndClose('lab-staff-report-export')}
+          onClick={() => onNavigate('lab-staff-report-export')}
           className={itemClass(isExport)}
         >
           <Download className="h-4 w-4 shrink-0" aria-hidden="true" />

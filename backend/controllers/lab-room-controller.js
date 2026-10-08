@@ -44,4 +44,73 @@ async function deleteLabRoom(req, res) {
   return res.status(204).send();
 }
 
-module.exports = { createLabRoom, listLabRooms, getLabRoom, updateLabRoom, deleteLabRoom };
+// GET /api/lab-rooms/status
+// Live status of every lab room: available/in-use, current class, PC counts.
+async function getLabRoomStatus(req, res) {
+  const [rooms, activeSessions] = await Promise.all([
+    prisma.labRoom.findMany({ orderBy: { roomName: 'asc' } }),
+    prisma.activeSession.findMany({
+      where: { status: 'ACTIVE' },
+      include: {
+        schedule: {
+          include: {
+            instructor: { select: { firstName: true, lastName: true } },
+          },
+        },
+        pcOccupancies: {
+          where: { timeReleased: null },
+          select: { id: true },
+        },
+      },
+    }),
+  ]);
+
+  // Index active sessions by labRoomId
+  const sessionByRoomId = new Map();
+  for (const s of activeSessions) {
+    sessionByRoomId.set(s.schedule.labRoomId, s);
+  }
+
+  const formatTime = (date) => {
+    const d = new Date(date);
+    const hour = d.getUTCHours();
+    const minute = String(d.getUTCMinutes()).padStart(2, '0');
+    const period = hour >= 12 ? 'PM' : 'AM';
+    return `${String(hour % 12 || 12).padStart(2, '0')}:${minute} ${period}`;
+  };
+
+  const result = rooms.map((room) => {
+    const session = sessionByRoomId.get(room.id);
+    const totalPcs = room.capacity ?? 0;
+    const occupiedPcs = session ? session.pcOccupancies.length : 0;
+
+    return {
+      id: String(room.id),
+      name: room.roomName,
+      location: room.description ?? '',
+      status: session ? 'IN USE' : 'AVAILABLE',
+      subject: session?.schedule.subjectCode ?? undefined,
+      instructor: session
+        ? `${session.schedule.instructor.firstName} ${session.schedule.instructor.lastName}`
+        : undefined,
+      section: session?.schedule.section ?? undefined,
+      timeslot: session
+        ? `${formatTime(session.schedule.startTime)} - ${formatTime(session.schedule.endTime)}`
+        : undefined,
+      availablePcs: Math.max(0, totalPcs - occupiedPcs),
+      occupiedPcs,
+      totalPcs,
+    };
+  });
+
+  return res.json({ rooms: result });
+}
+
+module.exports = {
+  createLabRoom,
+  listLabRooms,
+  getLabRoom,
+  updateLabRoom,
+  deleteLabRoom,
+  getLabRoomStatus,
+};

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Eye, EyeOff, FileSpreadsheet, KeyRound, Pencil, Save, Trash2, UserPlus, X } from 'lucide-react';
+import { Eye, EyeOff, FileSpreadsheet, KeyRound, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { readSheet } from 'read-excel-file/browser';
 import { ClamsHeader } from '../../components/ClamsHeader';
 import { AdminSubNav } from '../../components/AdminComponents/AdminSubNav';
@@ -14,9 +14,10 @@ interface UserManagementProps {
 const roleLabels: Record<UserRole, string> = {
   ADMIN: 'Administrator',
   STUDENT: 'Student',
-  INSTRUCTOR: 'Teacher / Instructor',
+  INSTRUCTOR: 'Instructor',
   CUSTODIAN: 'Custodian',
 };
+
 
 interface StudentImportRow {
   schoolId: string;
@@ -29,19 +30,21 @@ interface StudentImportRow {
   errors: string[];
 }
 
-type PasswordUpdateFeedback = {
-  type: 'success' | 'error';
-  message: string;
-};
+type NoticeType = 'success' | 'error' | 'delete';
 
 const MAX_STUDENT_IMPORT_ROWS = 100;
 const normalizeHeader = (value: unknown) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const cellText = (value: unknown) => value == null ? '' : String(value).trim();
 
-export const UserManagement: React.FC<UserManagementProps> = ({
-  adminToken,
-  onNavigate,
-}) => {
+// Shared blue primary button style
+const PRIMARY_BTN =
+  'inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-600/30 transition-all hover:bg-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60';
+
+// Smaller variant for inline Save buttons
+const PRIMARY_BTN_SM =
+  'inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#2563eb] px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-amber-600/30 transition-all hover:bg-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60';
+
+export const UserManagement: React.FC<UserManagementProps> = ({ adminToken, onNavigate }) => {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -51,15 +54,12 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [department, setDepartment] = useState('');
   const [studentYearLevel, setStudentYearLevel] = useState<number | ''>('');
   const [role, setRole] = useState<ManagedUserRole>('STUDENT');
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [editingPasswordId, setEditingPasswordId] = useState<number | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPasswordId, setSavingPasswordId] = useState<number | null>(null);
-  const [passwordUpdateFeedback, setPasswordUpdateFeedback] = useState<PasswordUpdateFeedback | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [pendingDeleteUser, setPendingDeleteUser] = useState<ManagedUser | null>(null);
   const [editingNameId, setEditingNameId] = useState<number | null>(null);
@@ -74,6 +74,30 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [isImporting, setIsImporting] = useState(false);
   const [importInputKey, setImportInputKey] = useState(0);
 
+  // Toast
+  const [successNotice, setSuccessNotice] = useState('');
+  const [noticeType, setNoticeType] = useState<NoticeType>('success');
+  const [modalError, setModalError] = useState('');
+
+  const showNotice = (message: string, type: NoticeType = 'success') => {
+    setNoticeType(type);
+    setSuccessNotice(message);
+  };
+
+  const clearNotice = () => setSuccessNotice('');
+
+  useEffect(() => {
+    if (!successNotice) return;
+    const timer = window.setTimeout(() => setSuccessNotice(''), 3500);
+    return () => window.clearTimeout(timer);
+  }, [successNotice]);
+
+  useEffect(() => {
+    if (!showInitialPassword) return;
+    const timeoutId = window.setTimeout(() => setShowInitialPassword(false), 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [showInitialPassword]);
+
   const loadUsersFromDatabase = async () => {
     const response = await fetch(`${API_BASE_URL}/users`, {
       headers: { Authorization: `Bearer ${adminToken}` },
@@ -87,53 +111,48 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     let active = true;
     const loadUsers = async () => {
       setIsLoading(true);
-      setError('');
       try {
         const databaseUsers = await loadUsersFromDatabase();
         if (active) setUsers(databaseUsers);
       } catch (loadError) {
-        if (active) setError(loadError instanceof Error ? loadError.message : 'Unable to load users.');
+        if (active) {
+          showNotice(loadError instanceof Error ? loadError.message : 'Unable to load users.', 'error');
+        }
       } finally {
         if (active) setIsLoading(false);
       }
     };
-    loadUsers();
+    void loadUsers();
     return () => { active = false; };
   }, [adminToken]);
 
-  useEffect(() => {
-    if (!passwordUpdateFeedback) return;
-    const timeoutId = window.setTimeout(() => setPasswordUpdateFeedback(null), 3000);
-    return () => window.clearTimeout(timeoutId);
-  }, [passwordUpdateFeedback]);
-
-  useEffect(() => {
-    if (!showInitialPassword) return;
-    const timeoutId = window.setTimeout(() => setShowInitialPassword(false), 3000);
-    return () => window.clearTimeout(timeoutId);
-  }, [showInitialPassword]);
+  const resetManualForm = () => {
+    setFirstName('');
+    setLastName('');
+    setSchoolId('');
+    setPassword('');
+    setShowInitialPassword(false);
+    setDepartment('');
+    setStudentYearLevel('');
+    setRole('STUDENT');
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalizedSchoolId = schoolId.trim();
     if (users.some((user) => user.schoolId.toLowerCase() === normalizedSchoolId.toLowerCase())) {
-      setError('A user with this school ID already exists.');
+      showNotice('A user with this school ID already exists.', 'error');
       return;
     }
     if (role === 'STUDENT' && (!studentYearLevel || Number(studentYearLevel) < 1 || Number(studentYearLevel) > 4)) {
-      setError('Student year level is required and must be between 1 and 4.');
+      showNotice('Student year level is required and must be between 1 and 4.', 'error');
       return;
     }
     setIsAdding(true);
-    setError('');
-    setNotice('');
     try {
       const response = await fetch(`${API_BASE_URL}/users`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminToken}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({
           schoolId: normalizedSchoolId,
           password,
@@ -146,22 +165,15 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       });
       const result = await readApiResponse<{ error?: string }>(response);
       if (!response.ok) throw new Error(result.error || 'Unable to add user.');
-      setFirstName('');
-      setLastName('');
-      setSchoolId('');
-      setPassword('');
-      setShowInitialPassword(false);
-      setDepartment('');
-      setStudentYearLevel('');
-      setRole('STUDENT');
-      setNotice(`${roleLabels[role]} account created and saved.`);
+      showNotice(`${roleLabels[role]} account created successfully.`);
+      resetManualForm();
       try {
         setUsers(await loadUsersFromDatabase());
       } catch {
-        setError('The account was saved, but the user list could not be refreshed. Reload this page.');
+        showNotice('Account saved, but user list could not refresh. Reload this page.', 'error');
       }
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'Unable to add user.');
+      showNotice(createError instanceof Error ? createError.message : 'Unable to add user.', 'error');
     } finally {
       setIsAdding(false);
     }
@@ -172,8 +184,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     setImportFileName(file.name);
     setImportRows([]);
     setImportErrors([]);
-    setError('');
-    setNotice('');
     setIsParsingImport(true);
 
     try {
@@ -213,22 +223,22 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       const knownSchoolIds = new Set(users.map((user) => user.schoolId.toLowerCase()));
       const seenSchoolIds = new Set<string>();
       const preview = dataRows.map((row, index): StudentImportRow => {
-        const schoolId = cellText(row[columns.schoolId]);
-        const firstName = cellText(row[columns.firstName]);
-        const lastName = cellText(row[columns.lastName]);
-        const password = cellText(row[columns.password]);
+        const sid = cellText(row[columns.schoolId]);
+        const fn = cellText(row[columns.firstName]);
+        const ln = cellText(row[columns.lastName]);
+        const pw = cellText(row[columns.password]);
         const course = columns.course < 0 ? '' : cellText(row[columns.course]);
         const yearText = columns.yearLevel < 0 ? '' : cellText(row[columns.yearLevel]);
         const yearLevel = yearText ? Number(yearText) : null;
         const errors: string[] = [];
-        const normalizedId = schoolId.toLowerCase();
+        const normalizedId = sid.toLowerCase();
 
-        if (!schoolId) errors.push('Missing school ID');
+        if (!sid) errors.push('Missing school ID');
         else if (knownSchoolIds.has(normalizedId)) errors.push('School ID already exists');
         else if (seenSchoolIds.has(normalizedId)) errors.push('Duplicate school ID in file');
-        if (!firstName) errors.push('Missing first name');
-        if (!lastName) errors.push('Missing last name');
-        if (password.length < 8) errors.push('Password must be at least 8 characters');
+        if (!fn) errors.push('Missing first name');
+        if (!ln) errors.push('Missing last name');
+        if (pw.length < 8) errors.push('Password must be at least 8 characters');
         if (!course) errors.push('Missing course');
         if (!yearText) errors.push('Missing year level');
         else if (!Number.isInteger(yearLevel) || yearLevel! < 1 || yearLevel! > 4) {
@@ -236,7 +246,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         }
         if (normalizedId) seenSchoolIds.add(normalizedId);
 
-        return { schoolId, firstName, lastName, password, course, yearLevel, rowNumber: index + 2, errors };
+        return { schoolId: sid, firstName: fn, lastName: ln, password: pw, course, yearLevel, rowNumber: index + 2, errors };
       });
       setImportRows(preview);
     } catch (parseError) {
@@ -250,15 +260,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     event.preventDefault();
     if (!importRows.length || importRows.some((row) => row.errors.length)) return;
     setIsImporting(true);
-    setError('');
-    setNotice('');
     try {
       const response = await fetch(`${API_BASE_URL}/users/import/students`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminToken}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({
           students: importRows.map(({ schoolId, firstName, lastName, password, course, yearLevel }) => ({
             schoolId, firstName, lastName, password, course, yearLevel,
@@ -279,54 +284,41 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       setImportRows([]);
       setImportFileName('');
       setImportInputKey((key) => key + 1);
-      setNotice(`${result.created ?? 0} student accounts imported.`);
+      showNotice(`${result.created ?? 0} student accounts imported successfully.`);
       setUsers(await loadUsersFromDatabase());
     } catch (importError) {
-      setError(importError instanceof Error ? importError.message : 'Unable to import students.');
+      showNotice(importError instanceof Error ? importError.message : 'Unable to import students.', 'error');
     } finally {
       setIsImporting(false);
     }
   };
 
   const handlePasswordUpdate = async (userId: number) => {
-    setError('');
-    setNotice('');
-    setPasswordUpdateFeedback(null);
     if (newPassword.length < 8) {
-      setPasswordUpdateFeedback({ type: 'error', message: 'Password must be at least 8 characters.' });
+      showNotice('Password must be at least 8 characters.', 'error');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordUpdateFeedback({ type: 'error', message: 'The passwords do not match.' });
+      showNotice('The passwords do not match.', 'error');
       return;
     }
     setSavingPasswordId(userId);
-    setError('');
-    setNotice('');
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/password`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminToken}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({ newPassword }),
       });
       const result = await readApiResponse<{ error?: string }>(response);
       if (!response.ok) throw new Error(result.error || 'Unable to update password.');
       const updatedUser = users.find((user) => user.id === userId);
-      const updatedUserName = updatedUser?.fullName
-        || [updatedUser?.firstName, updatedUser?.lastName].filter(Boolean).join(' ')
-        || 'Name not on file';
-      setPasswordUpdateFeedback({ type: 'success', message: `Password updated for ${updatedUserName}.` });
+      const name = updatedUser?.fullName || updatedUser?.schoolId || 'user';
+      showNotice(`Password updated for ${name}.`);
       setEditingPasswordId(null);
       setNewPassword('');
       setConfirmPassword('');
     } catch (updateError) {
-      setPasswordUpdateFeedback({
-        type: 'error',
-        message: updateError instanceof Error ? updateError.message : 'Unable to update password.',
-      });
+      showNotice(updateError instanceof Error ? updateError.message : 'Unable to update password.', 'error');
     } finally {
       setSavingPasswordId(null);
     }
@@ -334,8 +326,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
   const handleDeleteUser = async (user: ManagedUser) => {
     setDeletingUserId(user.id);
-    setError('');
-    setNotice('');
+    setModalError('');
     try {
       const response = await fetch(`${API_BASE_URL}/users/${user.id}`, {
         method: 'DELETE',
@@ -352,29 +343,19 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         setConfirmPassword('');
       }
       setPendingDeleteUser(null);
-      setNotice(`${roleLabels[user.role]} account ${user.schoolId} deleted.`);
+      showNotice(`${roleLabels[user.role]} account ${user.schoolId} deleted.`, 'delete');
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete user.');
+      setModalError(deleteError instanceof Error ? deleteError.message : 'Unable to delete user.');
     } finally {
       setDeletingUserId(null);
     }
   };
-
-  const pendingDeleteWarning = pendingDeleteUser?.role === 'STUDENT'
-    ? 'Their enrollments, attendance, PC occupancy, and reported PC issues will also be deleted.'
-    : pendingDeleteUser?.role === 'INSTRUCTOR'
-      ? 'Their schedules, sessions, enrollments, attendance, and related PC records will also be deleted.'
-      : pendingDeleteUser?.role === 'CUSTODIAN'
-        ? 'Their custodian profile will be deleted. Existing PC issue reports will remain without an assigned handler.'
-        : 'This administrator account will be permanently removed.';
 
   const beginNameEdit = (user: ManagedUser) => {
     setEditingNameId(user.id);
     setEditFirstName(user.firstName || '');
     setEditLastName(user.lastName || '');
     setEditingPasswordId(null);
-    setError('');
-    setNotice('');
   };
 
   const cancelNameEdit = () => {
@@ -387,20 +368,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     const first = editFirstName.trim();
     const last = editLastName.trim();
     if (!first || !last) {
-      setError('First and last names are required.');
+      showNotice('First and last names are required.', 'error');
       return;
     }
-
     setSavingNameId(userId);
-    setError('');
-    setNotice('');
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/name`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminToken}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({ firstName: first, lastName: last }),
       });
       const result = await readApiResponse<{
@@ -408,91 +383,99 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         user: { firstName: string; lastName: string; fullName: string };
       }>(response);
       if (!response.ok) throw new Error(result.error || 'Unable to update user name.');
-      setUsers((current) => current.map((user) => user.id === userId
-        ? { ...user, ...result.user }
-        : user));
-      setNotice(`Name updated for ${users.find((user) => user.id === userId)?.schoolId}.`);
+      setUsers((current) => current.map((user) => user.id === userId ? { ...user, ...result.user } : user));
+      showNotice(`Name updated successfully.`);
       cancelNameEdit();
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : 'Unable to update user name.');
+      showNotice(updateError instanceof Error ? updateError.message : 'Unable to update user name.', 'error');
     } finally {
       setSavingNameId(null);
     }
   };
 
+  const isDeleteToast = noticeType === 'delete';
+  const isErrorToast = noticeType === 'error';
+  const toastAccent = isDeleteToast ? 'bg-rose-500' : isErrorToast ? 'bg-rose-500' : 'bg-emerald-500';
+  const toastBorder = isDeleteToast || isErrorToast ? 'border-rose-200' : 'border-emerald-200';
+  const toastLabel = isDeleteToast || isErrorToast ? 'text-rose-600' : 'text-emerald-600';
+  const toastTitle = isDeleteToast ? 'Deleted' : isErrorToast ? 'Error' : 'Success';
+
   return (
-    <div className="min-h-[calc(100vh-44px)] bg-[#f4f6f9]">
+    <div className="min-h-[calc(100vh-44px)] bg-[#eef1f7]">
       <ClamsHeader onNavigate={onNavigate} statusLabel="Computer Laboratory System" />
 
       <div className="clams-layout">
         <AdminSubNav activeScreen="admin-user-management" onNavigate={onNavigate} />
 
         <main className="space-y-6">
-          <header>
-            <h1 className="text-xl font-bold text-slate-900">User Management</h1>
-            <p className="mt-1 text-xs text-slate-500">Add accounts, manage passwords, and remove user accounts.</p>
-          </header>
+          {/* Page header */}
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#1b325f]/15 bg-gradient-to-r from-[#1b325f]/[0.04] to-transparent px-6 py-5 shadow-sm">
+            <div>
+              <h1 className="text-2xl font-bold text-[#1b325f]">User Management</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Add accounts, manage passwords, and remove users.
+              </p>
+            </div>
+            <span className="rounded-lg border border-[#1b325f]/15 bg-white px-4 py-2 text-sm font-semibold text-[#1b325f] shadow-sm">
+              {users.length} account{users.length === 1 ? '' : 's'}
+            </span>
+          </div>
 
-          {!pendingDeleteUser && error && (
-            <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </p>
-          )}
-          {passwordUpdateFeedback && (
-            <p
-              role={passwordUpdateFeedback.type === 'error' ? 'alert' : 'status'}
-              className={`rounded-md border px-4 py-3 text-sm ${passwordUpdateFeedback.type === 'error'
-                ? 'border-rose-200 bg-rose-50 text-rose-700'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                }`}
-            >
-              {passwordUpdateFeedback.message}
-            </p>
-          )}
-          {notice && (
-            <p role="status" className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              {notice}
-            </p>
-          )}
-
-          <div className="grid items-start gap-6 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.6fr)]">
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.6fr)]">
+            {/* ── Form panel ── */}
             <form
               onSubmit={formMode === 'manual' ? handleSubmit : handleImportSubmit}
-              className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
+              className="space-y-5 overflow-hidden rounded-2xl border border-[#1b325f]/10 bg-white shadow-sm"
             >
-              <div className="grid grid-cols-2 rounded-md border border-slate-200 bg-slate-50 p-1" role="tablist" aria-label="User creation method">
+              {/* Tabs */}
+              <div className="flex border-b border-slate-100">
                 <button
                   type="button"
-                  role="tab"
-                  aria-selected={formMode === 'manual'}
-                  onClick={() => { setFormMode('manual'); setError(''); }}
-                  className={`rounded px-2 py-2 text-xs font-semibold ${formMode === 'manual' ? 'bg-white text-[#1b325f] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                  onClick={() => setFormMode('manual')}
+                  className={`flex-1 cursor-pointer px-4 py-4 text-sm font-semibold transition-colors ${formMode === 'manual'
+                    ? 'border-b-2 border-[#1b325f] text-[#1b325f]'
+                    : 'border-b-2 border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
                 >
                   Add One
                 </button>
                 <button
                   type="button"
-                  role="tab"
-                  aria-selected={formMode === 'import'}
-                  onClick={() => { setFormMode('import'); setError(''); }}
-                  className={`inline-flex items-center justify-center gap-1.5 rounded px-2 py-2 text-xs font-semibold ${formMode === 'import' ? 'bg-white text-[#1b325f] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                  onClick={() => setFormMode('import')}
+                  className={`inline-flex flex-1 cursor-pointer items-center justify-center gap-2 px-4 py-4 text-sm font-semibold transition-colors ${formMode === 'import'
+                    ? 'border-b-2 border-[#1b325f] text-[#1b325f]'
+                    : 'border-b-2 border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
                 >
-                  <FileSpreadsheet className="h-3.5 w-3.5" /> Import Excel
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Import Excel
                 </button>
               </div>
 
               {formMode === 'manual' ? (
-                <>
-                  <h2 className="text-sm font-bold text-slate-900">Add {roleLabels[role]}</h2>
+                <div className="space-y-4 px-6 pb-6">
+                  <h2 className="text-base font-bold text-slate-900">
+                    Add {roleLabels[role]}
+                  </h2>
 
                   <div className="grid grid-cols-2 gap-3">
                     <label className="block text-xs font-semibold text-slate-700">
                       First name
-                      <input required value={firstName} onChange={(event) => setFirstName(event.target.value)} className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm font-normal text-slate-900 focus:border-[#1b325f] focus:outline-none" />
+                      <input
+                        required
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        className="mt-1.5 w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15"
+                      />
                     </label>
                     <label className="block text-xs font-semibold text-slate-700">
                       Last name
-                      <input required value={lastName} onChange={(event) => setLastName(event.target.value)} className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm font-normal text-slate-900 focus:border-[#1b325f] focus:outline-none" />
+                      <input
+                        required
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="mt-1.5 w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15"
+                      />
                     </label>
                   </div>
 
@@ -501,12 +484,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                     <input
                       required
                       value={schoolId}
-                      onChange={(event) => {
-                        setSchoolId(event.target.value);
-                        setError('');
-                      }}
-                      className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm font-normal text-slate-900 focus:border-[#1b325f] focus:outline-none"
-                      placeholder="Enter school ID"
+                      onChange={(e) => setSchoolId(e.target.value)}
+                      placeholder="e.g. 24-10326"
+                      className="mt-1.5 w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 font-mono text-sm text-slate-900 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15"
                     />
                   </label>
 
@@ -514,11 +494,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                     Role
                     <select
                       value={role}
-                      onChange={(event) => {
-                        setRole(event.target.value as ManagedUserRole);
-                        if (event.target.value !== 'STUDENT') setStudentYearLevel('');
+                      onChange={(e) => {
+                        setRole(e.target.value as ManagedUserRole);
+                        if (e.target.value !== 'STUDENT') setStudentYearLevel('');
                       }}
-                      className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 focus:border-[#1b325f] focus:outline-none"
+                      className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#1b325f] focus:ring-4 focus:ring-[#1b325f]/15"
                     >
                       <option value="STUDENT">Student</option>
                       <option value="INSTRUCTOR">Instructor</option>
@@ -532,8 +512,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                       <select
                         required
                         value={studentYearLevel}
-                        onChange={(event) => setStudentYearLevel(event.target.value ? Number(event.target.value) : '')}
-                        className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 focus:border-[#1b325f] focus:outline-none"
+                        onChange={(e) => setStudentYearLevel(e.target.value ? Number(e.target.value) : '')}
+                        className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#1b325f] focus:ring-4 focus:ring-[#1b325f]/15"
                       >
                         <option value="">Select year</option>
                         <option value="1">1st Year</option>
@@ -552,20 +532,17 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                         minLength={8}
                         type={showInitialPassword ? 'text' : 'password'}
                         value={password}
-                        onChange={(event) => setPassword(event.target.value)}
+                        onChange={(e) => setPassword(e.target.value)}
                         autoComplete="new-password"
-                        className="w-full rounded-md border border-slate-300 px-3 py-2.5 pr-10 text-sm font-normal text-slate-900 focus:border-[#1b325f] focus:outline-none"
+                        className="w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 pr-10 text-sm text-slate-900 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15"
                       />
                       <button
                         type="button"
-                        onClick={() => setShowInitialPassword((visible) => !visible)}
-                        aria-label={showInitialPassword ? 'Hide initial password' : 'Show initial password'}
-                        aria-pressed={showInitialPassword}
+                        onClick={() => setShowInitialPassword((v) => !v)}
                         className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-800"
+                        aria-label="Toggle password visibility"
                       >
-                        {showInitialPassword
-                          ? <EyeOff className="h-4 w-4" aria-hidden="true" />
-                          : <Eye className="h-4 w-4" aria-hidden="true" />}
+                        {showInitialPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </span>
                   </label>
@@ -573,21 +550,21 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                   <button
                     type="submit"
                     disabled={isAdding}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#1b325f] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#142547] disabled:cursor-wait disabled:opacity-60"
+                    className={`${PRIMARY_BTN} w-full justify-center`}
                   >
-                    <UserPlus className="h-4 w-4" />
+                    <Plus className="h-4 w-4" />
                     {isAdding ? 'Saving...' : `Add ${roleLabels[role]}`}
                   </button>
-                </>
+                </div>
               ) : (
-                <section className="space-y-4">
+                <div className="space-y-4 px-6 pb-6">
                   <div>
-                    <h2 className="text-sm font-bold text-slate-900">Import Student Accounts</h2>
-                    <p className="mt-1 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">
-                      Student accounts only. This import does not create instructor, custodian, or administrator accounts.
+                    <h2 className="text-base font-bold text-slate-900">Import Students</h2>
+                    <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">
+                      Student accounts only. Instructor, custodian, and admin accounts must be added manually.
                     </p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                      Upload an .xlsx workbook with School ID, First Name, Last Name, Initial Password, Course, and Year Level columns. Year Level must be 1 to 4. Format IDs and passwords as text to preserve leading zeroes.
+                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                      Upload an .xlsx with columns: School ID, First Name, Last Name, Initial Password, Course, Year Level. Year Level must be 1–4.
                     </p>
                   </div>
 
@@ -596,35 +573,36 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                     <input
                       key={importInputKey}
                       type="file"
-                      accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                      onChange={(event) => void handleImportFile(event.target.files?.[0])}
-                      className="mt-1.5 block w-full rounded-md border border-slate-300 bg-white text-xs text-slate-600 file:mr-3 file:border-0 file:bg-slate-100 file:px-3 file:py-2.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
+                      accept=".xlsx"
+                      onChange={(e) => void handleImportFile(e.target.files?.[0])}
+                      className="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white text-xs text-slate-600 file:mr-3 file:border-0 file:bg-slate-100 file:px-3 file:py-2.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
                     />
                   </label>
 
                   {importFileName && <p className="text-xs text-slate-600">Selected: {importFileName}</p>}
                   {isParsingImport && <p className="text-xs text-slate-500">Reading workbook...</p>}
                   {importErrors.map((message) => (
-                    <p key={message} className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{message}</p>
+                    <p key={message} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                      {message}
+                    </p>
                   ))}
 
                   {importRows.length > 0 && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold text-slate-700">Preview ({importRows.length} rows)</span>
-                        <span className={importRows.some((row) => row.errors.length) ? 'text-rose-700' : 'text-emerald-700'}>
-                          {importRows.filter((row) => !row.errors.length).length} ready
+                        <span className={importRows.some((r) => r.errors.length) ? 'text-rose-700' : 'text-emerald-700'}>
+                          {importRows.filter((r) => !r.errors.length).length} ready
                         </span>
                       </div>
-                      <div className="max-h-64 overflow-auto rounded-md border border-slate-200">
+                      <div className="max-h-64 overflow-auto rounded-lg border border-slate-200">
                         <table className="w-full text-left text-[11px]">
-                          <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                          <thead className="sticky top-0 bg-[#1b325f] text-white">
                             <tr>
-                              <th className="px-2 py-2">Row</th>
-                              <th className="px-2 py-2">School ID</th>
-                              <th className="px-2 py-2">Student</th>
-                              <th className="px-2 py-2">Course / Year</th>
-                              <th className="px-2 py-2">Validation</th>
+                              <th className="px-2 py-2 font-semibold">Row</th>
+                              <th className="px-2 py-2 font-semibold">School ID</th>
+                              <th className="px-2 py-2 font-semibold">Student</th>
+                              <th className="px-2 py-2 font-semibold">Validation</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -633,7 +611,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                                 <td className="px-2 py-2 font-mono">{row.rowNumber}</td>
                                 <td className="px-2 py-2 font-mono">{row.schoolId || '—'}</td>
                                 <td className="px-2 py-2">{`${row.firstName} ${row.lastName}`.trim() || '—'}</td>
-                                <td className="px-2 py-2">{[row.course, row.yearLevel ? `Year ${row.yearLevel}` : ''].filter(Boolean).join(' · ') || '—'}</td>
                                 <td className={`px-2 py-2 ${row.errors.length ? 'text-rose-700' : 'text-emerald-700'}`}>
                                   {row.errors.join('; ') || 'Ready'}
                                 </td>
@@ -647,74 +624,78 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
                   <button
                     type="submit"
-                    disabled={isImporting || isParsingImport || !importRows.length || importRows.some((row) => row.errors.length > 0)}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#1b325f] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#142547] disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isImporting || isParsingImport || !importRows.length || importRows.some((r) => r.errors.length > 0)}
+                    className={`${PRIMARY_BTN} w-full justify-center`}
                   >
                     <FileSpreadsheet className="h-4 w-4" />
                     {isImporting ? 'Importing...' : `Import ${importRows.length} Students`}
                   </button>
-                </section>
+                </div>
               )}
             </form>
 
-            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-              <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900">Users</h2>
-                  <p className="mt-1 text-xs text-slate-500">{users.length} accounts</p>
-                </div>
+            {/* ── User list ── */}
+            <section className="overflow-hidden rounded-2xl border border-[#1b325f]/10 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-6 py-4">
+                <h2 className="text-base font-bold text-[#1b325f]">Accounts</h2>
               </div>
 
               {isLoading ? (
-                <p className="px-5 py-10 text-center text-sm text-slate-500">Loading users...</p>
+                <p className="px-6 py-16 text-center text-sm text-slate-500">Loading users...</p>
               ) : users.length === 0 ? (
-                <p className="px-5 py-10 text-center text-sm text-slate-500">No users found.</p>
+                <p className="px-6 py-16 text-center text-sm text-slate-500">No users yet.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-[11px] uppercase text-slate-500">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[#1b325f] text-xs font-bold uppercase tracking-wider text-white">
                       <tr>
-                        <th className="px-5 py-3 font-semibold">Name</th>
-                        <th className="px-5 py-3 font-semibold">School ID</th>
-                        <th className="px-5 py-3 font-semibold">Role</th>
-                        <th className="px-5 py-3 text-right font-semibold">Actions</th>
+                        <th className="px-5 py-4 text-left font-semibold text-white/70">Name</th>
+                        <th className="px-4 py-4 text-left font-semibold text-white/70">School ID</th>
+                        <th className="px-4 py-4 text-left font-semibold text-white/70">Role</th>
+                        <th className="px-5 py-4 text-right font-semibold text-white/70">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {users.map((user) => (
                         <React.Fragment key={user.id}>
-                          <tr>
-                            <td className="px-5 py-3.5 font-semibold text-slate-800">
+                          <tr className="transition-colors hover:bg-[#1b325f]/[0.02]">
+                            <td className="px-5 py-4 font-semibold text-slate-800">
                               {editingNameId === user.id ? (
                                 <div className="grid gap-2 sm:grid-cols-2">
                                   <input
-                                    aria-label={`First name for ${user.schoolId}`}
                                     value={editFirstName}
-                                    onChange={(event) => setEditFirstName(event.target.value)}
+                                    onChange={(e) => setEditFirstName(e.target.value)}
                                     maxLength={191}
-                                    className="min-w-0 rounded border border-slate-300 px-2 py-1.5 font-normal focus:border-[#1b325f] focus:outline-none"
+                                    className="rounded-lg border border-slate-300 px-2.5 py-2 text-sm font-normal focus:border-[#1b325f] focus:outline-none"
+                                    aria-label="First name"
                                   />
                                   <input
-                                    aria-label={`Last name for ${user.schoolId}`}
                                     value={editLastName}
-                                    onChange={(event) => setEditLastName(event.target.value)}
+                                    onChange={(e) => setEditLastName(e.target.value)}
                                     maxLength={191}
-                                    className="min-w-0 rounded border border-slate-300 px-2 py-1.5 font-normal focus:border-[#1b325f] focus:outline-none"
+                                    className="rounded-lg border border-slate-300 px-2.5 py-2 text-sm font-normal focus:border-[#1b325f] focus:outline-none"
+                                    aria-label="Last name"
                                   />
                                 </div>
-                              ) : user.isCurrentUser ? 'Current administrator' : user.fullName || 'Name not on file'}
+                              ) : (
+                                user.isCurrentUser ? 'Admin' : user.fullName || 'Name not on file'
+                              )}
                             </td>
-                            <td className="px-5 py-3.5 font-mono text-slate-600">{user.schoolId}</td>
-                            <td className="px-5 py-3.5 text-slate-600">{roleLabels[user.role]}</td>
-                            <td className="px-5 py-3.5 text-right">
-                              <div className="inline-flex items-center gap-3">
+                            <td className="px-4 py-4 font-mono text-xs text-slate-600">{user.schoolId}</td>
+                            <td className="px-4 py-4">
+                              <span>
+                                {roleLabels[user.role]}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <div className="inline-flex items-center gap-1">
                                 {editingNameId === user.id ? (
                                   <>
                                     <button
                                       type="button"
                                       onClick={() => void handleNameUpdate(user.id)}
                                       disabled={savingNameId === user.id}
-                                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50"
+                                      className={PRIMARY_BTN_SM}
                                     >
                                       <Save className="h-3.5 w-3.5" />
                                       {savingNameId === user.id ? 'Saving...' : 'Save'}
@@ -723,10 +704,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                                       type="button"
                                       onClick={cancelNameEdit}
                                       disabled={savingNameId === user.id}
-                                      aria-label={`Cancel name edit for ${user.schoolId}`}
-                                      className="inline-flex items-center text-slate-500 hover:text-slate-800 disabled:opacity-50"
+                                      className="rounded-md border border-slate-300 p-2 text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                                      aria-label="Cancel"
                                     >
-                                      <X className="h-4 w-4" />
+                                      <X className="h-3.5 w-3.5" />
                                     </button>
                                   </>
                                 ) : (
@@ -735,27 +716,35 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                                       <button
                                         type="button"
                                         onClick={() => beginNameEdit(user)}
-                                        aria-label={`Edit name for ${user.schoolId}`}
-                                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1b325f] hover:underline"
+                                        className="rounded-md p-2 text-slate-500 transition-colors hover:bg-[#1b325f]/10 hover:text-[#1b325f]"
+                                        title="Edit name"
                                       >
-                                        <Pencil className="h-3.5 w-3.5" />
-                                        Edit Name
+                                        <Pencil className="h-4 w-4" />
                                       </button>
                                     )}
-                                    <button type="button" onClick={() => { setEditingPasswordId(editingPasswordId === user.id ? null : user.id); setNewPassword(''); setConfirmPassword(''); setError(''); }} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1b325f] hover:underline">
-                                      <KeyRound className="h-3.5 w-3.5" />
-                                      Change
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingPasswordId(editingPasswordId === user.id ? null : user.id);
+                                        setNewPassword('');
+                                        setConfirmPassword('');
+                                      }}
+                                      className="rounded-md p-2 text-slate-500 transition-colors hover:bg-[#1b325f]/10 hover:text-[#1b325f]"
+                                      title="Change password"
+                                    >
+                                      <KeyRound className="h-4 w-4" />
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => { setPendingDeleteUser(user); setError(''); setNotice(''); }}
-                                      disabled={user.isCurrentUser || deletingUserId === user.id}
-                                      title={user.isCurrentUser ? 'You cannot delete the signed-in administrator' : 'Delete user account'}
-                                      aria-label={`Delete ${user.schoolId}`}
-                                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+                                      onClick={() => {
+                                        setPendingDeleteUser(user);
+                                        setModalError('');
+                                      }}
+                                      disabled={user.isCurrentUser}
+                                      title={user.isCurrentUser ? 'Cannot delete yourself' : 'Delete user'}
+                                      className="rounded-md p-2 text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
                                     >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                      {deletingUserId === user.id ? 'Deleting...' : 'Delete'}
+                                      <Trash2 className="h-4 w-4" />
                                     </button>
                                   </>
                                 )}
@@ -766,10 +755,49 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                             <tr>
                               <td colSpan={4} className="bg-slate-50 px-5 py-4">
                                 <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
-                                  <label className="block text-xs font-semibold text-slate-700">New password<input type="password" minLength={8} autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal focus:border-[#1b325f] focus:outline-none" /></label>
-                                  <label className="block text-xs font-semibold text-slate-700">Confirm password<input type="password" minLength={8} autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal focus:border-[#1b325f] focus:outline-none" /></label>
-                                  <button type="button" onClick={() => void handlePasswordUpdate(user.id)} disabled={savingPasswordId === user.id || !newPassword || !confirmPassword} className="inline-flex items-center justify-center gap-1.5 rounded-md bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-3.5 w-3.5" />{savingPasswordId === user.id ? 'Saving...' : 'Save'}</button>
-                                  <button type="button" onClick={() => { setEditingPasswordId(null); setNewPassword(''); setConfirmPassword(''); }} className="inline-flex items-center justify-center rounded-md border border-slate-300 p-2 text-slate-600 hover:bg-white" aria-label="Cancel password change"><X className="h-4 w-4" /></button>
+                                  <label className="block text-xs font-semibold text-slate-700">
+                                    New password
+                                    <input
+                                      type="password"
+                                      minLength={8}
+                                      autoComplete="new-password"
+                                      value={newPassword}
+                                      onChange={(e) => setNewPassword(e.target.value)}
+                                      className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal focus:border-[#1b325f] focus:outline-none"
+                                    />
+                                  </label>
+                                  <label className="block text-xs font-semibold text-slate-700">
+                                    Confirm password
+                                    <input
+                                      type="password"
+                                      minLength={8}
+                                      autoComplete="new-password"
+                                      value={confirmPassword}
+                                      onChange={(e) => setConfirmPassword(e.target.value)}
+                                      className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal focus:border-[#1b325f] focus:outline-none"
+                                    />
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handlePasswordUpdate(user.id)}
+                                    disabled={savingPasswordId === user.id || !newPassword || !confirmPassword}
+                                    className={PRIMARY_BTN_SM}
+                                  >
+                                    <Save className="h-3.5 w-3.5" />
+                                    {savingPasswordId === user.id ? 'Saving...' : 'Save'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingPasswordId(null);
+                                      setNewPassword('');
+                                      setConfirmPassword('');
+                                    }}
+                                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 p-2.5 text-slate-600 transition-colors hover:bg-white"
+                                    aria-label="Cancel"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -785,28 +813,62 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         </main>
       </div>
 
+      {/* Toast */}
+      {successNotice && (
+        <div className="fixed right-6 top-6 z-[60] animate-toast-in">
+          <div className={`flex items-center gap-3 overflow-hidden rounded-xl border bg-white px-5 py-4 shadow-2xl ${toastBorder}`}>
+            <div className={`h-10 w-1 shrink-0 rounded-full ${toastAccent}`} />
+            <div className="min-w-0">
+              <div className={`text-xs font-bold uppercase tracking-wider ${toastLabel}`}>{toastTitle}</div>
+              <div className="mt-0.5 text-sm text-slate-700">{successNotice}</div>
+            </div>
+            <button
+              type="button"
+              onClick={clearNotice}
+              className="ml-2 rounded-md p-1 text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-500"
+              aria-label="Dismiss"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
       {pendingDeleteUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f1a30]/70 px-4 backdrop-blur-sm">
           <section
             role="dialog"
             aria-modal="true"
-            aria-labelledby="delete-user-title"
-            aria-describedby="delete-user-description"
-            className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-xl"
+            className="animate-pop-in w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl shadow-rose-900/20"
           >
-            <h2 id="delete-user-title" className="text-base font-bold text-slate-900">
-              Delete {roleLabels[pendingDeleteUser.role].toLowerCase()} {pendingDeleteUser.schoolId}?
-            </h2>
-            <p id="delete-user-description" className="mt-2 text-sm leading-6 text-slate-600">
-              {pendingDeleteWarning} This cannot be undone.
-            </p>
-            {error && <p role="alert" className="mt-3 text-xs font-medium text-rose-700">{error}</p>}
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="bg-rose-700 px-6 py-4">
+              <h2 className="text-lg font-bold text-white">
+                Delete {roleLabels[pendingDeleteUser.role].toLowerCase()}?
+              </h2>
+            </div>
+            <div className="space-y-4 px-6 py-6">
+              <p className="text-sm leading-relaxed text-slate-600">
+                Delete{' '}
+                <span className="font-mono font-bold text-slate-800">{pendingDeleteUser.schoolId}</span>
+                {pendingDeleteUser.fullName && (
+                  <>
+                    {' '}—{' '}
+                    <span className="font-semibold text-slate-800">{pendingDeleteUser.fullName}</span>
+                  </>
+                )}
+                ?
+              </p>
+              {modalError && (
+                <p role="alert" className="text-sm font-medium text-rose-700">{modalError}</p>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
               <button
                 type="button"
-                onClick={() => { setPendingDeleteUser(null); setError(''); }}
+                onClick={() => { setPendingDeleteUser(null); setModalError(''); }}
                 disabled={deletingUserId === pendingDeleteUser.id}
-                className="rounded-md border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -814,9 +876,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                 type="button"
                 onClick={() => void handleDeleteUser(pendingDeleteUser)}
                 disabled={deletingUserId === pendingDeleteUser.id}
-                className="inline-flex items-center gap-1.5 rounded-md bg-rose-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-rose-800 disabled:cursor-wait disabled:opacity-60"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-rose-300 bg-white px-4 py-2.5 text-sm font-semibold text-rose-600 transition-colors hover:border-rose-400 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-wait disabled:opacity-60"
               >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                <Trash2 className="h-4 w-4" />
                 {deletingUserId === pendingDeleteUser.id ? 'Deleting...' : 'Delete user'}
               </button>
             </div>

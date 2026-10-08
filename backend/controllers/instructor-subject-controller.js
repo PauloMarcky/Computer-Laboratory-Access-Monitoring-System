@@ -10,7 +10,7 @@ async function listWorkload(req, res) {
         include: { subject: true },
         orderBy: { subject: { code: 'asc' } },
       },
-      schedules: true,
+      schedules: { where: { isActive: true }, select: { id: true } },
     },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   });
@@ -22,12 +22,14 @@ async function listWorkload(req, res) {
     lastName: i.lastName,
     department: i.department || '',
     schoolId: i.user.schoolId,
-    subjects: i.instructorSubjects.map((link) => ({
-      id: link.subject.id,
-      code: link.subject.code,
-      title: link.subject.title,
-      yearLevel: link.subject.yearLevel,
-    })),
+    subjects: i.instructorSubjects
+      .filter((link) => link.subject.isActive)
+      .map((link) => ({
+        id: link.subject.id,
+        code: link.subject.code,
+        title: link.subject.title,
+        yearLevel: link.subject.yearLevel,
+      })),
     scheduleCount: i.schedules.length,
   }));
 
@@ -40,7 +42,7 @@ async function listInstructorSubjects(req, res) {
   if (!instructorId) return res.status(400).json({ error: 'Invalid instructor id.' });
 
   const rows = await prisma.instructorSubject.findMany({
-    where: { instructorId },
+    where: { instructorId, subject: { isActive: true } },
     include: { subject: true },
     orderBy: { subject: { code: 'asc' } },
   });
@@ -53,6 +55,11 @@ async function assignSubject(req, res) {
   const subjectId = toId(req.body?.subjectId);
   if (!instructorId || !subjectId) {
     return res.status(400).json({ error: 'instructorId and subjectId are required.' });
+  }
+
+  const subject = await prisma.subject.findUnique({ where: { id: subjectId } });
+  if (!subject || !subject.isActive) {
+    return res.status(404).json({ error: 'Subject not found or archived.' });
   }
 
   try {

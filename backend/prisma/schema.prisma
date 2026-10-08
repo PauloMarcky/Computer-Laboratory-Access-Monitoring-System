@@ -90,10 +90,10 @@ model Schedule {
   dayOfWeek    String   @map("day_of_week") @db.VarChar(191)
   startTime    DateTime @map("start_time") @db.DateTime(3)
   endTime      DateTime @map("end_time") @db.DateTime(3)
+  isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
-  // Relations — these were missing
   instructor       InstructorProfile @relation(fields: [instructorId], references: [id], onDelete: Cascade)
   labRoom          LabRoom           @relation(fields: [labRoomId], references: [id], onDelete: Cascade)
   term             Term?             @relation(fields: [termId], references: [id], onDelete: SetNull)
@@ -215,10 +215,11 @@ model Subject {
   code      String   @unique @db.VarChar(20)
   title     String   @db.VarChar(191)
   yearLevel Int?     @map("year_level")
+  isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  instructorSubjects InstructorSubject[] // ← MOVED UP
+  instructorSubjects InstructorSubject[]
 
   @@map("subjects")
 }

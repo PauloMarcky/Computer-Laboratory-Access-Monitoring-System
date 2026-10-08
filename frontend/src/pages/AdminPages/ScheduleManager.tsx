@@ -10,7 +10,7 @@ import type {
   WireframeScreenId,
 } from '../../types';
 
-/* ---------------- Types for dropdown data ---------------- */
+/* ---------------- Types ---------------- */
 
 interface SubjectOption {
   id: number;
@@ -25,6 +25,8 @@ interface TermOption {
   semester: string;
   isActive: boolean;
 }
+
+type NoticeType = 'success' | 'delete';
 
 /* ---------------- Helpers ---------------- */
 
@@ -69,7 +71,6 @@ const YEAR_LEVELS = [
   { value: 4, label: '4th Year' },
 ];
 
-/* Draft used when the user opens the "create" modal */
 const createDraft = (day: ScheduleEntry['day'] = 'Mon', startTime = '02:00 PM'): ScheduleEntry => ({
   id: '',
   instructorId: 0,
@@ -89,7 +90,7 @@ const createDraft = (day: ScheduleEntry['day'] = 'Mon', startTime = '02:00 PM'):
 });
 
 /* ================================================================
- * FORM MODAL — create or edit one schedule
+ * FORM MODAL
  * ================================================================ */
 
 interface ScheduleFormModalProps {
@@ -101,8 +102,8 @@ interface ScheduleFormModalProps {
   onDeleteSchedule: (id: string) => Promise<void>;
   onManageRoster: (entry: ScheduleEntry) => void;
   onClose: () => void;
-  onSaved: () => void;
-  onDeleted: () => void;
+  onSaved: (message?: string) => void;
+  onDeleted: (message?: string) => void;
 }
 
 const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
@@ -121,7 +122,27 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
 
   const [labRoomId, setLabRoomId] = useState(editingSchedule.labRoomId || 0);
   const [instructorId, setInstructorId] = useState(editingSchedule.instructorId || 0);
-  const [selectedDay, setSelectedDay] = useState<ScheduleEntry['day']>(editingSchedule.day);
+
+  const [selectedDays, setSelectedDays] = useState<Set<ScheduleEntry['day']>>(
+    new Set([editingSchedule.day])
+  );
+
+  const toggleDay = (day: ScheduleEntry['day']) => {
+    if (isEdit) {
+      setSelectedDays(new Set([day]));
+      return;
+    }
+    setSelectedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(day)) {
+        if (next.size > 1) next.delete(day);
+      } else {
+        next.add(day);
+      }
+      return next;
+    });
+  };
+
   const [startTime, setStartTime] = useState(toInputTime(editingSchedule.startTime));
   const [endTime, setEndTime] = useState(toInputTime(editingSchedule.endTime));
 
@@ -138,7 +159,6 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   const [actionError, setActionError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  /* Load subjects + terms */
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -168,7 +188,6 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
     return () => { cancelled = true; };
   }, [token, isEdit]);
 
-  /* Load instructor subject assignments */
   useEffect(() => {
     let cancelled = false;
     const loadAssignments = async () => {
@@ -198,12 +217,11 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
     setActionError('');
 
     const selectedTerm = terms.find((t) => t.id === termId);
+    const days = Array.from(selectedDays);
 
-    const newEntry: ScheduleEntry = {
-      id: editingSchedule.id,
+    const baseEntry = {
       instructorId,
       labRoomId,
-      day: selectedDay,
       startTime: toScheduleTime(startTime),
       endTime: toScheduleTime(endTime),
       subject: subjectCode,
@@ -213,15 +231,53 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       room: labRooms.find((r) => r.id === labRoomId)?.roomName || '',
       department: instructors.find((i) => i.id === instructorId)?.department || '',
       semester: selectedTerm ? `${selectedTerm.academicYear} ${selectedTerm.semester}` : '',
-      colorTheme: editingSchedule.colorTheme || 'blue',
+      colorTheme: editingSchedule.colorTheme || ('blue' as const),
       termId: termId || null,
       section,
       yearLevel,
     };
 
     try {
-      await onSaveSchedule(newEntry);
-      onSaved();
+      if (isEdit) {
+        await onSaveSchedule({
+          ...baseEntry,
+          id: editingSchedule.id,
+          day: days[0],
+        } as ScheduleEntry);
+        onSaved('Schedule updated successfully.');
+      } else {
+        const created: string[] = [];
+        const failures: string[] = [];
+
+        for (const day of days) {
+          try {
+            await onSaveSchedule({
+              ...baseEntry,
+              id: '',
+              day,
+            } as ScheduleEntry);
+            created.push(day);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Unknown error';
+            failures.push(`${day}: ${msg}`);
+          }
+        }
+
+        if (failures.length > 0) {
+          if (created.length === 0) {
+            throw new Error(failures[0]);
+          }
+          throw new Error(
+            `Created ${created.length} of ${days.length} schedules. ${failures.join('; ')}`
+          );
+        }
+
+        onSaved(
+          created.length === 1
+            ? 'Schedule created successfully.'
+            : `${created.length} schedules created successfully.`
+        );
+      }
     } catch (saveError) {
       setActionError(saveError instanceof Error ? saveError.message : 'Unable to save schedule.');
     } finally {
@@ -234,7 +290,7 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
     setActionError('');
     try {
       await onDeleteSchedule(editingSchedule.id);
-      onDeleted();
+      onDeleted('Schedule deleted successfully.');
     } catch (deleteError) {
       setActionError(deleteError instanceof Error ? deleteError.message : 'Unable to delete schedule.');
     }
@@ -242,39 +298,39 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/60 px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f1a30]/70 backdrop-blur-sm px-4"
       onClick={onClose}
     >
       <div
-        className="animate-pop-in relative my-8 w-full max-w-2xl rounded-xl border border-slate-200 bg-white shadow-2xl"
+        className="animate-pop-in relative w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl shadow-[#1b325f]/40"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-xl border-b border-slate-100 bg-white px-6 py-4">
-          <h1 className="text-base font-bold text-slate-900">
+        {/* Navy header — matches login aesthetic */}
+        <div className="flex items-center justify-between bg-[#1b325f] px-6 py-4">
+          <h1 className="text-lg font-bold text-white">
             {isEdit ? 'Edit Schedule' : 'Create Schedule'}
           </h1>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-full bg-white/10 p-1.5 text-white/80 ring-1 ring-white/20 transition-colors hover:bg-white/20 hover:text-white"
             aria-label="Close"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6 px-6 py-6">
-          <div className="grid grid-cols-1 gap-5 text-xs sm:grid-cols-2">
+        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5 text-sm">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className="mb-1.5 block font-semibold text-slate-600">Laboratory Room</label>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">Lab Room</label>
               <select
                 required
                 value={labRoomId || ''}
                 onChange={(e) => setLabRoomId(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 font-medium text-slate-800 focus:border-[#1b325f] focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 font-medium text-slate-800 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15"
               >
-                <option value="" disabled>Select a lab room</option>
+                <option value="" disabled>Select</option>
                 {labRooms.map((room) => (
                   <option key={room.id} value={room.id}>{room.roomName}</option>
                 ))}
@@ -282,19 +338,19 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </div>
 
             <div>
-              <label className="mb-1.5 block font-semibold text-slate-600">Subject</label>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">Subject</label>
               <select
                 required
                 disabled={loadingOptions}
                 value={subjectCode}
                 onChange={(e) => setSubjectCode(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 font-medium text-slate-800 focus:border-[#1b325f] focus:outline-none disabled:opacity-60"
+                className="w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 font-medium text-slate-800 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15 disabled:opacity-60"
               >
                 <option value="" disabled>
-                  {loadingOptions ? 'Loading subjects...' : 'Select a subject'}
+                  {loadingOptions ? 'Loading...' : 'Select'}
                 </option>
                 {subjects.some((s) => assignedSubjectIds.includes(s.id)) && (
-                  <optgroup label="Assigned to selected teacher">
+                  <optgroup label="Assigned to teacher">
                     {subjects.filter((s) => assignedSubjectIds.includes(s.id)).map((s) => (
                       <option key={s.id} value={s.code}>{s.code} — {s.title}</option>
                     ))}
@@ -309,60 +365,71 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </div>
 
             <div>
-              <label className="mb-1.5 block font-semibold text-slate-600">Assigned Teacher</label>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">Teacher</label>
               <select
                 required
                 value={instructorId || ''}
                 onChange={(e) => setInstructorId(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 font-medium text-slate-800 focus:border-[#1b325f] focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 font-medium text-slate-800 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15"
               >
-                <option value="" disabled>Select an instructor</option>
+                <option value="" disabled>Select</option>
                 {instructors.map((i) => (
                   <option key={i.id} value={i.id}>{i.firstName} {i.lastName}</option>
                 ))}
               </select>
             </div>
+          </div>
 
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className="mb-1.5 block font-semibold text-slate-600">Semester / Term</label>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">Term</label>
               <select
                 required
                 disabled={loadingOptions}
                 value={termId}
                 onChange={(e) => setTermId(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 font-medium text-slate-800 focus:border-[#1b325f] focus:outline-none disabled:opacity-60"
+                className="w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 font-medium text-slate-800 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15 disabled:opacity-60"
               >
                 <option value="" disabled>
-                  {loadingOptions ? 'Loading terms...' : 'Select a term'}
+                  {loadingOptions ? 'Loading...' : 'Select'}
                 </option>
                 {terms.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.academicYear} · {t.semester}{t.isActive ? ' (Active)' : ''}
+                    {t.academicYear} · {t.semester}{t.isActive ? ' ★' : ''}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="mb-1.5 block font-semibold text-slate-600">Section</label>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">Section</label>
               <input
                 type="text"
                 required
                 value={section}
-                onChange={(e) => setSection(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  const letter = e.target.value.replace(/[^A-Za-z]/g, '').slice(0, 1);
+                  setSection(letter.toUpperCase());
+                }}
+                onKeyDown={(e) => {
+                  if (e.key.length === 1 && !/[A-Za-z]/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                  }
+                }}
                 placeholder="A"
-                maxLength={10}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 font-medium uppercase text-slate-800 focus:border-[#1b325f] focus:outline-none"
+                maxLength={1}
+                pattern="[A-Za-z]"
+                className="w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 font-medium uppercase text-slate-800 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block font-semibold text-slate-600">Year Level</label>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">Year Level</label>
               <select
                 required
                 value={yearLevel}
                 onChange={(e) => setYearLevel(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 font-medium text-slate-800 focus:border-[#1b325f] focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 font-medium text-slate-800 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15"
               >
                 {YEAR_LEVELS.map((y) => (
                   <option key={y.value} value={y.value}>{y.label}</option>
@@ -372,56 +439,66 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           </div>
 
           {actionError && (
-            <p role="alert" className="text-xs font-medium text-rose-700">{actionError}</p>
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+              {actionError}
+            </p>
           )}
 
-          <div className="text-xs">
-            <label className="mb-2 block font-semibold text-slate-600">Day of Week</label>
-            <div className="grid grid-cols-5 gap-2.5">
-              {ALL_DAYS.map((day) => {
-                const active = selectedDay === day;
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    onClick={() => setSelectedDay(day)}
-                    className={`cursor-pointer rounded-lg py-2.5 font-semibold transition-colors ${active
-                        ? 'bg-[#2563eb] text-white shadow-2xs'
-                        : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-                      }`}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 text-xs sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr_1fr]">
             <div>
-              <label className="mb-1.5 block font-semibold text-slate-600">Start Time</label>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                {isEdit ? 'Day of Week' : 'Days'}
+                {!isEdit && (
+                  <span className="ml-2 font-normal text-slate-400">
+                    — creates a schedule for each
+                  </span>
+                )}
+              </label>
+              <div className="grid grid-cols-5 gap-1.5">
+                {ALL_DAYS.map((day) => {
+                  const active = selectedDays.has(day);
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => toggleDay(day)}
+                      aria-pressed={active}
+                      className={`cursor-pointer rounded-lg py-2.5 text-xs font-semibold transition-all ${active
+                        ? 'bg-[#2563eb] text-white shadow-md shadow-amber-600/30'
+                        : 'border border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        }`}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">Start Time</label>
               <input
                 type="time"
                 required
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 font-mono font-medium tabular-nums text-slate-800 focus:border-[#1b325f] focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 font-mono text-sm font-medium tabular-nums text-slate-800 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15"
               />
             </div>
+
             <div>
-              <label className="mb-1.5 block font-semibold text-slate-600">End Time</label>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">End Time</label>
               <input
                 type="time"
                 required
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 font-mono font-medium tabular-nums text-slate-800 focus:border-[#1b325f] focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 bg-slate-50/60 px-3 py-2.5 font-mono text-sm font-medium tabular-nums text-slate-800 outline-none transition focus:border-[#1b325f] focus:bg-white focus:ring-4 focus:ring-[#1b325f]/15"
               />
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
             <div className="flex gap-2">
               {isEdit && (
                 <>
@@ -429,7 +506,7 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                     type="button"
                     onClick={() => void handleDelete()}
                     disabled={isSaving}
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50/50 px-4 py-2.5 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-100/70 disabled:opacity-50"
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50/50 px-3.5 py-2 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-100/70 disabled:opacity-50"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     <span>Delete</span>
@@ -439,7 +516,7 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                     type="button"
                     onClick={() => onManageRoster(editingSchedule)}
                     disabled={!/^\d+$/.test(editingSchedule.id)}
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#1b325f]/20 bg-[#1b325f]/5 px-3.5 py-2 text-xs font-semibold text-[#1b325f] transition-colors hover:bg-[#1b325f]/10 disabled:opacity-50"
                   >
                     <Users className="h-3.5 w-3.5" />
                     <span>Manage Students</span>
@@ -448,7 +525,7 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               )}
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={onClose}
@@ -459,7 +536,7 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               <button
                 type="submit"
                 disabled={isSaving || !instructors.length || !labRooms.length || loadingOptions}
-                className="cursor-pointer rounded-lg bg-[#2563eb] px-5 py-2.5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-blue-700 disabled:opacity-60"
+                className="cursor-pointer rounded-lg bg-[#2563eb] px-5 py-2.5 text-xs font-semibold text-white shadow-lg shadow-amber-600/30 transition-all hover:bg-blue-700 disabled:opacity-60"
               >
                 {isSaving ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Schedule'}
               </button>
@@ -472,7 +549,7 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
 };
 
 /* ================================================================
- * MAIN VIEW — calendar + form modal
+ * MAIN VIEW
  * ================================================================ */
 
 interface AdminScheduleModuleProps {
@@ -506,9 +583,10 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
   const [semFilter, setSemFilter] = useState('');
   const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [successNotice, setSuccessNotice] = useState('');
+  const [noticeType, setNoticeType] = useState<NoticeType>('success');
   const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
 
-  /* Modal state — non-null = open */
   const [modalSchedule, setModalSchedule] = useState<ScheduleEntry | null>(null);
 
   const openCreate = (day?: ScheduleEntry['day'], startTime?: string) => {
@@ -519,12 +597,41 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
   };
   const closeModal = () => setModalSchedule(null);
 
+  const handleSaved = (message?: string) => {
+    setModalSchedule(null);
+    if (message) {
+      setNoticeType('success');
+      setSuccessNotice(message);
+    }
+  };
+
+  const handleDeleted = (message?: string) => {
+    setModalSchedule(null);
+    if (message) {
+      setNoticeType('delete');
+      setSuccessNotice(message);
+    }
+  };
+
+  useEffect(() => {
+    if (!successNotice) return;
+    const timer = window.setTimeout(() => setSuccessNotice(''), 3500);
+    return () => window.clearTimeout(timer);
+  }, [successNotice]);
+
   const handleDeleteAllSchedules = async () => {
     setIsDeletingAll(true);
     setDeleteError('');
     try {
+      const count = schedules.length;
       await onDeleteAllSchedules();
       setIsDeleteConfirmationOpen(false);
+      setNoticeType('delete');
+      setSuccessNotice(
+        count === 1
+          ? 'Schedule deleted successfully.'
+          : `All ${count} schedules deleted successfully.`
+      );
     } catch (deleteError) {
       setDeleteError(deleteError instanceof Error ? deleteError.message : 'Unable to delete schedules.');
     } finally {
@@ -551,37 +658,40 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
   const getColorClasses = (theme: ScheduleEntry['colorTheme']) => {
     switch (theme) {
       case 'blue':
-        return 'bg-sky-50/95 border-l-4 border-sky-600 text-sky-950 hover:bg-sky-100/80';
+        return 'bg-sky-100/90 border-l-4 border-sky-600 text-sky-950 hover:bg-sky-200/90 shadow-sm';
       case 'green':
-        return 'bg-emerald-50/95 border-l-4 border-emerald-600 text-emerald-950 hover:bg-emerald-100/80';
+        return 'bg-emerald-100/90 border-l-4 border-emerald-600 text-emerald-950 hover:bg-emerald-200/90 shadow-sm';
       case 'amber':
-        return 'bg-amber-50/95 border-l-4 border-amber-500 text-amber-950 hover:bg-amber-100/80';
+        return 'bg-amber-100/90 border-l-4 border-amber-500 text-amber-950 hover:bg-amber-200/90 shadow-sm';
       case 'purple':
-        return 'bg-purple-50/95 border-l-4 border-purple-600 text-purple-950 hover:bg-purple-100/80';
+        return 'bg-purple-100/90 border-l-4 border-purple-600 text-purple-950 hover:bg-purple-200/90 shadow-sm';
     }
   };
 
+  const isDelete = noticeType === 'delete';
+
   return (
-    <div className="min-h-[calc(100vh-44px)] bg-[#f4f6f9]">
+    <div className="min-h-[calc(100vh-44px)] bg-[#eef1f7]">
       <ClamsHeader onNavigate={onNavigate} statusLabel="Computer Laboratory System" />
 
       <div className="clams-layout">
         <AdminSubNav activeScreen="admin-schedule-module" onNavigate={onNavigate} />
 
-        <main className="space-y-5">
-          <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/90 bg-white px-4 py-3">
-            <div className="flex flex-wrap items-center gap-3 text-xs">
-              <div className="mr-1 inline-flex items-center gap-1.5 font-semibold text-slate-500">
-                <SlidersHorizontal className="h-3.5 w-3.5" />
+        <main className="space-y-6">
+          {/* Filter + actions bar — navy tinted */}
+          <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#1b325f]/15 bg-gradient-to-r from-[#1b325f]/[0.04] to-transparent px-6 py-5 shadow-sm">
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <div className="mr-2 inline-flex items-center gap-2 font-bold text-[#1b325f]">
+                <SlidersHorizontal className="h-4 w-4" />
                 <span>Filters:</span>
               </div>
 
-              <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
-                <span className="text-slate-400">Lab Room:</span>
+              <div className="flex items-center gap-2 rounded-lg border border-[#1b325f]/15 bg-white/80 px-4 py-2 shadow-sm">
+                <span className="text-slate-500">Lab Room:</span>
                 <select
                   value={roomFilter}
                   onChange={(e) => setRoomFilter(e.target.value)}
-                  className="cursor-pointer bg-transparent font-bold text-slate-800 focus:outline-none"
+                  className="cursor-pointer bg-transparent font-bold text-[#1b325f] focus:outline-none"
                 >
                   <option value="All Rooms">All Rooms</option>
                   {[...new Set(schedules.map((s) => s.room))].map((room) => (
@@ -590,12 +700,12 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
                 </select>
               </div>
 
-              <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
-                <span className="text-slate-400">Semester:</span>
+              <div className="flex items-center gap-2 rounded-lg border border-[#1b325f]/15 bg-white/80 px-4 py-2 shadow-sm">
+                <span className="text-slate-500">Semester:</span>
                 <select
                   value={semFilter}
                   onChange={(e) => setSemFilter(e.target.value)}
-                  className="cursor-pointer bg-transparent font-bold text-slate-800 focus:outline-none"
+                  className="cursor-pointer bg-transparent font-bold text-[#1b325f] focus:outline-none"
                 >
                   <option value="">All Semesters</option>
                   {[...new Set(schedules.map((s) => s.semester))].map((semester) => (
@@ -605,77 +715,77 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button
                 type="button"
                 onClick={() => setIsDeleteConfirmationOpen(true)}
                 disabled={!schedules.length || isLoading || isDeletingAll}
-                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-rose-200 bg-rose-50/50 px-4 py-2.5 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-100/70 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-rose-200 bg-white px-5 py-3 text-sm font-semibold text-rose-600 shadow-sm transition-all hover:bg-rose-50 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>{isDeletingAll ? 'Deleting...' : 'Delete All Schedule'}</span>
+                <Trash2 className="h-4 w-4" />
+                <span>{isDeletingAll ? 'Deleting...' : 'Delete All'}</span>
               </button>
               <button
                 type="button"
                 onClick={() => openCreate('Mon', '02:00 PM')}
-                className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-blue-700"
+                className="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-600/30 transition-all hover:bg-blue-700 hover:shadow-lg"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-4 w-4" />
                 <span>Create Schedule</span>
               </button>
             </div>
           </section>
 
           {(error || deleteError) && (
-            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
               {deleteError || error}
             </p>
           )}
 
           {isLoading ? (
-            <section className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
+            <section className="rounded-2xl border border-[#1b325f]/10 bg-white px-6 py-16 text-center text-base text-slate-500 shadow-sm">
               Loading schedules...
             </section>
           ) : schedules.length > 0 ? (
-            <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white">
+            <section className="overflow-hidden rounded-2xl border border-[#1b325f]/10 bg-white shadow-lg shadow-[#1b325f]/5">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[820px] table-fixed border-collapse">
+                <table className="w-full min-w-[900px] table-fixed border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/60 text-xs font-bold text-slate-700">
-                      <th className="w-28 border-r border-slate-100 px-4 py-3.5 text-left font-semibold text-slate-400">
+                    <tr className="bg-[#1b325f] text-sm font-bold text-white">
+                      <th className="w-32 border-r border-white/10 px-5 py-4 text-left font-semibold text-white/70">
                         Time
                       </th>
                       {DAYS.map((day) => (
-                        <th key={day.key} className="border-r border-slate-100 px-4 py-3.5 text-center last:border-r-0">
+                        <th key={day.key} className="border-r border-white/10 px-5 py-4 text-center last:border-r-0">
                           {day.label}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs">
+                  <tbody className="divide-y divide-slate-100 text-sm">
                     {timeSlots.map((slot) => (
-                      <tr key={slot} className="h-28">
-                        <td className="border-r border-slate-100 p-3 text-center align-middle font-mono text-[11px] font-semibold tabular-nums text-slate-400">
+                      <tr key={slot} className="h-32 transition-colors hover:bg-[#1b325f]/[0.02]">
+                        <td className="border-r border-slate-100 bg-[#1b325f]/[0.03] p-4 text-center align-middle font-mono text-xs font-bold tabular-nums text-[#1b325f]">
                           {slot}
                         </td>
                         {DAYS.map((day) => {
                           const cellEntries = groupedSchedules[`${day.key}|${slot}`] || [];
                           return (
-                            <td key={day.key} className="border-r border-slate-100 p-2 align-top last:border-r-0">
+                            <td key={day.key} className="border-r border-slate-100 p-3 align-top last:border-r-0">
                               {cellEntries.length > 0 ? (
-                                <div className="space-y-1.5">
+                                <div className="space-y-2">
                                   {cellEntries.map((entry) => (
                                     <button
                                       key={`${entry.id}-${entry.room}-${entry.subject}`}
                                       type="button"
                                       onClick={() => openEdit(entry)}
-                                      className={`flex min-h-[92px] w-full cursor-pointer flex-col justify-between rounded-lg p-2.5 text-left transition-colors ${getColorClasses(entry.colorTheme)}`}
+                                      className={`flex min-h-[100px] w-full cursor-pointer flex-col justify-between rounded-lg p-3.5 text-left transition-all ${getColorClasses(entry.colorTheme)}`}
                                     >
                                       <div>
-                                        <div className="line-clamp-1 text-xs font-bold leading-snug">{entry.subject}</div>
-                                        <div className="mt-0.5 truncate text-[11px] opacity-80">{entry.teacher}</div>
+                                        <div className="line-clamp-1 text-sm font-bold leading-snug">{entry.subject}</div>
+                                        <div className="mt-1 truncate text-xs opacity-80">{entry.teacher}</div>
                                       </div>
-                                      <div className="mt-2 text-[10px] font-bold opacity-90">{entry.room}</div>
+                                      <div className="mt-2 text-[11px] font-bold opacity-90">{entry.room}</div>
                                     </button>
                                   ))}
                                 </div>
@@ -683,7 +793,7 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => openCreate(day.key, slot)}
-                                  className="flex h-full min-h-[92px] w-full cursor-pointer items-center justify-center rounded-lg border border-transparent text-[11px] text-slate-300 transition-colors hover:border-dashed hover:border-slate-300 hover:bg-slate-50/70 hover:text-slate-500"
+                                  className="flex h-full min-h-[100px] w-full cursor-pointer items-center justify-center rounded-lg border border-transparent text-xs text-slate-300 transition-colors hover:border-dashed hover:border-[#1b325f]/30 hover:bg-[#1b325f]/5 hover:text-[#1b325f]"
                                 >
                                   Unassigned
                                 </button>
@@ -698,14 +808,41 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
               </div>
             </section>
           ) : (
-            <section className="rounded-xl border border-slate-200/90 bg-white px-6 py-12 text-center">
-              <p className="text-sm font-semibold text-slate-500">No schedules assigned yet.</p>
+            <section className="rounded-2xl border border-[#1b325f]/10 bg-white px-6 py-16 text-center shadow-sm">
+              <p className="text-base font-semibold text-slate-500">No schedules assigned yet.</p>
             </section>
           )}
         </main>
       </div>
 
-      {/* Schedule form modal */}
+      {/* Toast — navy or rose tinted, matching the login aesthetic */}
+      {successNotice && (
+        <div className="fixed right-6 top-6 z-[60] animate-toast-in">
+          <div
+            className={`flex items-center gap-3 overflow-hidden rounded-xl border bg-white px-5 py-4 shadow-2xl ${isDelete
+              ? 'border-rose-200 shadow-rose-900/20'
+              : 'border-emerald-200 shadow-emerald-900/20'
+              }`}
+          >
+            <div className={`h-10 w-1 shrink-0 rounded-full ${isDelete ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+            <div className="min-w-0">
+              <div className={`text-xs font-bold uppercase tracking-wider ${isDelete ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {isDelete ? 'Deleted' : 'Success'}
+              </div>
+              <div className="mt-0.5 text-sm text-slate-700">{successNotice}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSuccessNotice('')}
+              className="ml-2 rounded-md p-1 text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-500"
+              aria-label="Dismiss"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {modalSchedule && (
         <ScheduleFormModal
           editingSchedule={modalSchedule}
@@ -716,50 +853,53 @@ export const AdminScheduleModuleView: React.FC<AdminScheduleModuleProps> = ({
           onDeleteSchedule={onDeleteSchedule}
           onManageRoster={onManageRoster}
           onClose={closeModal}
-          onSaved={closeModal}
-          onDeleted={closeModal}
+          onSaved={handleSaved}
+          onDeleted={handleDeleted}
         />
       )}
 
-      {/* Delete-all confirmation modal */}
       {isDeleteConfirmationOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f1a30]/70 px-4 py-6 backdrop-blur-sm">
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-schedules-title"
             aria-describedby="delete-schedules-description"
-            className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-xl"
+            className="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl shadow-rose-900/20"
           >
-            <h2 id="delete-schedules-title" className="text-base font-bold text-slate-900">
-              Delete all schedules?
-            </h2>
-            <p id="delete-schedules-description" className="mt-2 text-sm leading-6 text-slate-600">
-              This permanently deletes all {schedules.length} schedules, along with their enrollments and active sessions.
-            </p>
-            {deleteError && (
-              <p role="alert" className="mt-3 text-xs font-medium text-rose-700">
-                {deleteError}
+            <div className="bg-rose-600 px-7 py-4">
+              <h2 id="delete-schedules-title" className="text-lg font-bold text-white">
+                Delete all schedules?
+              </h2>
+            </div>
+            <div className="p-7">
+              <p id="delete-schedules-description" className="text-sm leading-relaxed text-slate-600">
+                This permanently deletes all {schedules.length} schedules, along with their enrollments and active sessions.
               </p>
-            )}
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsDeleteConfirmationOpen(false)}
-                disabled={isDeletingAll}
-                className="rounded-md border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDeleteAllSchedules()}
-                disabled={isDeletingAll}
-                className="inline-flex items-center gap-1.5 rounded-md bg-rose-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-rose-800 disabled:cursor-wait disabled:opacity-60"
-              >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                {isDeletingAll ? 'Deleting...' : 'Delete all'}
-              </button>
+              {deleteError && (
+                <p role="alert" className="mt-4 text-sm font-medium text-rose-700">
+                  {deleteError}
+                </p>
+              )}
+              <div className="mt-7 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteConfirmationOpen(false)}
+                  disabled={isDeletingAll}
+                  className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteAllSchedules()}
+                  disabled={isDeletingAll}
+                  className="inline-flex items-center gap-2 rounded-lg bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-rose-700/30 transition-all hover:bg-rose-800 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  {isDeletingAll ? 'Deleting...' : 'Delete all'}
+                </button>
+              </div>
             </div>
           </section>
         </div>

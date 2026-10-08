@@ -45,6 +45,7 @@ async function getRoster(req, res) {
       instructor: schedule.instructor,
       labRoom: schedule.labRoom,
       term: schedule.term,
+      isActive: schedule.isActive,
     },
     enrolled: enrollments.map((e) => ({
       enrollmentId: e.id,
@@ -72,6 +73,10 @@ async function bulkEnroll(req, res) {
 
   if (!scheduleId) return res.status(400).json({ error: 'scheduleId is required.' });
   if (studentProfileIds.length === 0) return res.status(400).json({ error: 'At least one student is required.' });
+
+  const schedule = await prisma.schedule.findUnique({ where: { scheduleId } });
+  if (!schedule) return res.status(404).json({ error: 'Schedule not found.' });
+  if (!schedule.isActive) return res.status(409).json({ error: 'Cannot enroll students in an archived schedule.' });
 
   try {
     const result = await prisma.classEnrollment.createMany({

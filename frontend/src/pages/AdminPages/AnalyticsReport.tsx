@@ -99,7 +99,7 @@ export const AdminStudentsAnalyticsView: React.FC<AdminAnalyticsProps> = ({
   );
 
   return (
-    <div className="min-h-[calc(100vh-44px)] bg-[#f4f6f9]">
+    <div className="min-h-[calc(100vh-44px)] bg-[#eef1f7]">
       <ClamsHeader onNavigate={onNavigate} statusLabel="Computer Laboratory System" />
 
       <div className="clams-layout">
@@ -107,13 +107,13 @@ export const AdminStudentsAnalyticsView: React.FC<AdminAnalyticsProps> = ({
 
         <main className="space-y-6">
           {loading && (
-            <section className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
+            <section className="rounded-2xl border border-[#1b325f]/10 bg-white px-6 py-16 text-center text-sm text-slate-500 shadow-sm">
               Loading analytics…
             </section>
           )}
 
           {error && (
-            <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
               {error}
             </p>
           )}
@@ -121,191 +121,200 @@ export const AdminStudentsAnalyticsView: React.FC<AdminAnalyticsProps> = ({
           {!loading && data && (
             <>
               {data.term && (
-                <p className="text-xs text-slate-500">
+                <p className="text-sm text-slate-500">
                   Showing data for{' '}
-                  <span className="font-semibold text-slate-700">
+                  <span className="font-bold text-[#1b325f]">
                     {data.term.academicYear} · {data.term.semester}
                   </span>
                 </p>
               )}
 
               {/* KPI Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <div className="bg-white rounded-xl border border-slate-200/90 p-5">
-                  <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-2xl border border-[#1b325f]/10 bg-white p-6 shadow-sm">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     Total Registered
                   </div>
-                  <div className="text-2xl font-bold text-slate-900 mt-1.5 font-mono tabular-nums">
+                  <div className="mt-2 font-mono text-3xl font-bold tabular-nums text-[#1b325f]">
                     {kpis?.totalRegistered ?? 0}
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl border border-slate-200/90 p-5">
-                  <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                <div className="rounded-2xl border border-[#1b325f]/10 bg-white p-6 shadow-sm">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     Avg Attendance Rate
                   </div>
-                  <div className="text-2xl font-bold text-[#1e3a8a] mt-1.5 font-mono tabular-nums">
+                  <div className="mt-2 font-mono text-3xl font-bold tabular-nums text-emerald-600">
                     {kpis ? `${kpis.avgAttendanceRate}%` : '0%'}
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl border border-slate-200/90 p-5">
-                  <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                <div className="rounded-2xl border border-[#1b325f]/10 bg-white p-6 shadow-sm">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     Total Absences (Sem)
                   </div>
-                  <div className="text-2xl font-bold text-rose-700 mt-1.5 font-mono tabular-nums">
+                  <div className="mt-2 font-mono text-3xl font-bold tabular-nums text-rose-600">
                     {kpis?.totalAbsences ?? 0}
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl border border-slate-200/90 p-5">
-                  <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                <div className="rounded-2xl border border-[#1b325f]/10 bg-white p-6 shadow-sm">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     Students At Risk
                   </div>
-                  <div className="text-2xl font-bold text-amber-600 mt-1.5 font-mono tabular-nums">
+                  <div className="mt-2 font-mono text-3xl font-bold tabular-nums text-amber-600">
                     {kpis?.studentsAtRisk ?? 0}
                   </div>
                 </div>
               </div>
 
               {/* Charts + Top Absent */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
                 {/* Left column */}
-                <div className="lg:col-span-8 space-y-6">
+                <div className="space-y-6 lg:col-span-8">
                   {/* Monthly Absence Rate (SVG line chart) */}
-                  <section className="bg-white rounded-xl border border-slate-200/90 p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-xs font-bold text-slate-900">
+                  <section className="rounded-2xl border border-[#1b325f]/10 bg-white shadow-sm">
+                    <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                      <h2 className="text-sm font-bold text-[#1b325f]">
                         Monthly Absence Rate (%)
                       </h2>
                       {data.monthlyAbsenceRate.length > 0 && (
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-xs text-slate-400">
                           {data.monthlyAbsenceRate.length} month
                           {data.monthlyAbsenceRate.length === 1 ? '' : 's'}
                         </span>
                       )}
                     </div>
 
-                    {data.monthlyAbsenceRate.length === 0 ? (
-                      <div className="h-44 w-full flex items-center justify-center text-xs text-slate-400">
-                        No attendance data yet.
-                      </div>
-                    ) : (
-                      <MonthlyLineChart points={data.monthlyAbsenceRate} />
-                    )}
+                    <div className="px-6 py-5">
+                      {data.monthlyAbsenceRate.length === 0 ? (
+                        <div className="flex h-44 w-full items-center justify-center text-sm text-slate-400">
+                          No attendance data yet.
+                        </div>
+                      ) : (
+                        <MonthlyLineChart points={data.monthlyAbsenceRate} />
+                      )}
+                    </div>
                   </section>
 
                   {/* Total Absences by Subject Code */}
-                  <section className="bg-white rounded-xl border border-slate-200/90 p-6">
-                    <h2 className="text-xs font-bold text-slate-900 mb-6">
-                      Total Absences by Subject Code
-                    </h2>
+                  <section className="rounded-2xl border border-[#1b325f]/10 bg-white shadow-sm">
+                    <div className="border-b border-slate-100 px-6 py-4">
+                      <h2 className="text-sm font-bold text-[#1b325f]">
+                        Total Absences by Subject Code
+                      </h2>
+                    </div>
 
-                    {data.subjectAbsences.length === 0 ? (
-                      <div className="h-44 w-full flex items-center justify-center text-xs text-slate-400">
-                        No absence data yet.
-                      </div>
-                    ) : (
-                      <>
-                        <div className="h-44 flex items-end justify-around gap-4 pt-6 px-4 border-b border-slate-100">
-                          {data.subjectAbsences.map((item) => (
-                            <div
-                              key={item.code}
-                              className="flex flex-col items-center justify-end h-full w-16"
-                            >
-                              <span className="text-[11px] font-bold text-slate-700 font-mono tabular-nums mb-1.5">
-                                {item.count}
-                              </span>
+                    <div className="px-6 py-5">
+                      {data.subjectAbsences.length === 0 ? (
+                        <div className="flex h-44 w-full items-center justify-center text-sm text-slate-400">
+                          No absence data yet.
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex h-44 items-end justify-around gap-4 border-b border-slate-100 px-4 pt-6">
+                            {data.subjectAbsences.map((item) => (
                               <div
-                                style={{
-                                  height: `${Math.max(4, (item.count / maxSubjectAbsence) * 100)}%`,
-                                }}
-                                className="w-9 rounded-t-md transition-all bg-[#1b325f]"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex items-center justify-around gap-4 pt-2.5 px-4">
-                          {data.subjectAbsences.map((item) => (
-                            <div
-                              key={item.code}
-                              className="w-16 text-center text-[10px] font-bold text-slate-400 font-mono"
-                            >
-                              {item.code}
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
+                                key={item.code}
+                                className="flex h-full w-16 flex-col items-center justify-end"
+                              >
+                                <span className="mb-1.5 font-mono text-xs font-bold tabular-nums text-[#1b325f]">
+                                  {item.count}
+                                </span>
+                                <div
+                                  style={{
+                                    height: `${Math.max(4, (item.count / maxSubjectAbsence) * 100)}%`,
+                                  }}
+                                  className="w-10 rounded-t-md bg-gradient-to-t from-[#1b325f] to-[#3b5d9c] transition-all"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex items-center justify-around gap-4 px-4 pt-3">
+                            {data.subjectAbsences.map((item) => (
+                              <div
+                                key={item.code}
+                                className="w-16 text-center font-mono text-xs font-bold text-slate-500"
+                              >
+                                {item.code}
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </section>
                 </div>
 
                 {/* Right column — Top absent students */}
-                <section className="lg:col-span-4 bg-white rounded-xl border border-slate-200/90 p-6">
-                  <div className="flex items-start justify-between gap-2">
+                <section className="rounded-2xl border border-[#1b325f]/10 bg-white shadow-sm lg:col-span-4">
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-6 py-4">
                     <div>
-                      <h2 className="text-xs font-bold text-slate-900">Top Absent Students</h2>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        Compliance tracking with privacy-masked names
+                      <h2 className="text-sm font-bold text-[#1b325f]">Top Absent Students</h2>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        Privacy-masked names
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setUnmaskNames((v) => !v)}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-[#1b325f] cursor-pointer"
-                      title="Toggle Privacy Mask"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#1b325f]/15 bg-[#1b325f]/5 px-3 py-1.5 text-xs font-semibold text-[#1b325f] transition-colors hover:bg-[#1b325f]/10"
+                      title="Toggle privacy mask"
                     >
                       {unmaskNames ? (
                         <>
-                          <EyeOff className="w-3.5 h-3.5" />
+                          <EyeOff className="h-3.5 w-3.5" />
                           <span>Mask</span>
                         </>
                       ) : (
                         <>
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="h-3.5 w-3.5" />
                           <span>Unmask</span>
                         </>
                       )}
                     </button>
                   </div>
 
-                  <div className="mt-5 space-y-3">
+                  <div className="space-y-3 px-6 py-5">
                     {data.topAbsentStudents.length === 0 && (
-                      <p className="text-xs text-slate-400">No student data.</p>
+                      <p className="py-4 text-center text-sm text-slate-400">No student data.</p>
                     )}
                     {data.topAbsentStudents.map((st) => (
                       <div
                         key={st.studentProfileId}
-                        className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-100 flex items-center justify-between gap-3"
+                        className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${st.severity === 'critical'
+                            ? 'border-rose-100 bg-rose-50/50'
+                            : 'border-amber-100 bg-amber-50/50'
+                          }`}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex min-w-0 items-center gap-3">
                           {st.severity === 'critical' ? (
-                            <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                              <AlertCircle className="w-4 h-4" />
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                              <AlertCircle className="h-4 w-4" />
                             </div>
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                              <AlertTriangle className="w-4 h-4" />
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                              <AlertTriangle className="h-4 w-4" />
                             </div>
                           )}
                           <div className="min-w-0">
-                            <div className="text-xs font-bold text-slate-900 truncate">
+                            <div className="truncate text-sm font-bold text-slate-900">
                               {unmaskNames ? st.fullName : st.masked}
                             </div>
-                            <div className="text-[10px] font-semibold text-slate-400 uppercase">
+                            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                               {st.course}
                               {st.yearLevel != null && ` · Year ${st.yearLevel}`}
                             </div>
-                            <div className="text-[10px] text-slate-400 font-mono">
+                            <div className="font-mono text-xs text-slate-400">
                               {st.schoolId}
                             </div>
                           </div>
                         </div>
 
                         <span
-                          className={`px-2.5 py-1 rounded text-[11px] font-bold font-mono tabular-nums shrink-0 ${st.severity === 'critical'
-                              ? 'bg-rose-50 text-rose-700'
-                              : 'bg-amber-50 text-amber-700'
+                          className={`shrink-0 rounded-md px-3 py-1 font-mono text-xs font-bold tabular-nums ${st.severity === 'critical'
+                              ? 'bg-rose-100 text-rose-700'
+                              : 'bg-amber-100 text-amber-700'
                             }`}
                         >
                           {st.absences} Days
@@ -328,7 +337,6 @@ export const AdminStudentsAnalyticsView: React.FC<AdminAnalyticsProps> = ({
  * No dependency — draws axis, grid, polyline, and dots.
  * -------------------------------------------------------------- */
 const MonthlyLineChart: React.FC<{ points: MonthlyPoint[] }> = ({ points }) => {
-  // Chart geometry
   const W = 640;
   const H = 200;
   const PAD_L = 40;
@@ -336,7 +344,6 @@ const MonthlyLineChart: React.FC<{ points: MonthlyPoint[] }> = ({ points }) => {
   const PAD_T = 16;
   const PAD_B = 32;
 
-  // Fixed 0-100% scale (absence rate; 100% = everyone absent all the time)
   const yMax = 100;
 
   const plotW = W - PAD_L - PAD_R;
@@ -352,12 +359,14 @@ const MonthlyLineChart: React.FC<{ points: MonthlyPoint[] }> = ({ points }) => {
     .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)} ${yAt(p.rate)}`)
     .join(' ');
 
-  // Grid lines at 25, 50, 75, 100
+  // Filled area under the line
+  const areaD = `${pathD} L ${xAt(n - 1)} ${PAD_T + plotH} L ${xAt(0)} ${PAD_T + plotH} Z`;
+
   const gridLines = [0, 25, 50, 75, 100];
 
   return (
     <div className="w-full overflow-x-auto">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-44" preserveAspectRatio="none">
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-44 w-full" preserveAspectRatio="none">
         {/* Grid + Y labels */}
         {gridLines.map((g) => {
           const y = yAt(g);
@@ -375,7 +384,7 @@ const MonthlyLineChart: React.FC<{ points: MonthlyPoint[] }> = ({ points }) => {
                 x={PAD_L - 6}
                 y={y + 3}
                 textAnchor="end"
-                fontSize="9"
+                fontSize="10"
                 fill="#94a3b8"
                 fontFamily="ui-monospace, monospace"
               >
@@ -385,12 +394,15 @@ const MonthlyLineChart: React.FC<{ points: MonthlyPoint[] }> = ({ points }) => {
           );
         })}
 
+        {/* Filled area under line */}
+        <path d={areaD} fill="#1b325f" fillOpacity="0.08" />
+
         {/* Line */}
         <path
           d={pathD}
           fill="none"
           stroke="#1b325f"
-          strokeWidth="2"
+          strokeWidth="2.5"
           strokeLinejoin="round"
           strokeLinecap="round"
         />
@@ -401,13 +413,12 @@ const MonthlyLineChart: React.FC<{ points: MonthlyPoint[] }> = ({ points }) => {
           const y = yAt(p.rate);
           return (
             <g key={p.month}>
-              <circle cx={x} cy={y} r="3.5" fill="#1b325f" />
-              <circle cx={x} cy={y} r="6" fill="#1b325f" fillOpacity="0.12" />
+              <circle cx={x} cy={y} r="4" fill="white" stroke="#1b325f" strokeWidth="2" />
               <text
                 x={x}
                 y={H - 10}
                 textAnchor="middle"
-                fontSize="9"
+                fontSize="10"
                 fill="#64748b"
                 fontFamily="ui-monospace, monospace"
               >

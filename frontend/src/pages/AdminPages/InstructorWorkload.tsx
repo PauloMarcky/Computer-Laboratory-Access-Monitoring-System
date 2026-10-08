@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Search, SlidersHorizontal, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Search, SlidersHorizontal, Plus, Trash2, X } from 'lucide-react';
 import { ClamsHeader } from '../../components/ClamsHeader';
 import { AdminSubNav } from '../../components/AdminComponents/AdminSubNav';
 import { API_BASE_URL, readApiResponse } from '../../api';
@@ -27,6 +27,12 @@ interface AdminTeacherWorkloadProps {
   onNavigate: (screen: WireframeScreenId) => void;
 }
 
+type NoticeType = 'success' | 'delete';
+
+// Shared primary button style
+const PRIMARY_BTN =
+  'inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-600/30 transition-all hover:bg-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50';
+
 export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
   token,
   onNavigate,
@@ -39,10 +45,25 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [pendingSubject, setPendingSubject] = useState<Record<number, number | ''>>({});
+  // Multi-select: one Set per instructor
+  const [pendingSelections, setPendingSelections] = useState<Record<number, Set<number>>>({});
   const [busy, setBusy] = useState(false);
 
+  const [successNotice, setSuccessNotice] = useState('');
+  const [noticeType, setNoticeType] = useState<NoticeType>('success');
+
   const headers = { Authorization: `Bearer ${token}` };
+
+  useEffect(() => {
+    if (!successNotice) return;
+    const timer = window.setTimeout(() => setSuccessNotice(''), 3500);
+    return () => window.clearTimeout(timer);
+  }, [successNotice]);
+
+  const showNotice = (message: string, type: NoticeType = 'success') => {
+    setNoticeType(type);
+    setSuccessNotice(message);
+  };
 
   const loadAll = async () => {
     setLoading(true);
@@ -70,30 +91,69 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const handleAssign = async (instructorId: number) => {
-    const subjectId = pendingSubject[instructorId];
-    if (!subjectId) return;
+  const togglePending = (instructorId: number, subjectId: number) => {
+    setPendingSelections((prev) => {
+      const current = new Set(prev[instructorId] ?? []);
+      if (current.has(subjectId)) current.delete(subjectId);
+      else current.add(subjectId);
+      return { ...prev, [instructorId]: current };
+    });
+  };
+
+  const clearPending = (instructorId: number) => {
+    setPendingSelections((prev) => ({ ...prev, [instructorId]: new Set() }));
+  };
+
+  const handleAssignAll = async (instructorId: number) => {
+    const selected = Array.from(pendingSelections[instructorId] ?? []);
+    if (selected.length === 0) return;
+
     setBusy(true);
     setError('');
-    try {
-      const res = await fetch(`${API_BASE_URL}/instructor-subjects/${instructorId}/subjects`, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subjectId }),
-      });
-      const data = await readApiResponse<{ error?: string; link: { subject: SubjectLite } }>(res);
-      if (!res.ok) throw new Error(data.error || 'Unable to assign subject.');
+
+    const succeeded: SubjectLite[] = [];
+    const failures: string[] = [];
+
+    for (const subjectId of selected) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/instructor-subjects/${instructorId}/subjects`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subjectId }),
+        });
+        const data = await readApiResponse<{ error?: string; link: { subject: SubjectLite } }>(res);
+        if (!res.ok) throw new Error(data.error || 'Unable to assign subject.');
+        succeeded.push(data.link.subject);
+      } catch (e) {
+        const subject = allSubjects.find((s) => s.id === subjectId);
+        const label = subject ? subject.code : `#${subjectId}`;
+        failures.push(`${label}: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      }
+    }
+
+    if (succeeded.length > 0) {
       setInstructors((prev) =>
         prev.map((i) =>
-          i.id === instructorId ? { ...i, subjects: [...i.subjects, data.link.subject] } : i
+          i.id === instructorId ? { ...i, subjects: [...i.subjects, ...succeeded] } : i
         )
       );
-      setPendingSubject((prev) => ({ ...prev, [instructorId]: '' }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to assign subject.');
-    } finally {
-      setBusy(false);
+      clearPending(instructorId);
     }
+
+    if (failures.length === 0) {
+      showNotice(
+        succeeded.length === 1
+          ? '1 subject assigned successfully.'
+          : `${succeeded.length} subjects assigned successfully.`
+      );
+    } else if (succeeded.length === 0) {
+      setError(`Failed to assign: ${failures.join('; ')}`);
+    } else {
+      setError(`Assigned ${succeeded.length} of ${selected.length}. Failures — ${failures.join('; ')}`);
+      showNotice(`${succeeded.length} of ${selected.length} subjects assigned.`);
+    }
+
+    setBusy(false);
   };
 
   const handleUnassign = async (instructorId: number, subjectId: number) => {
@@ -108,12 +168,20 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
         const data = await readApiResponse<{ error?: string }>(res);
         throw new Error(data.error || 'Unable to remove subject.');
       }
+      const removedSubject = instructors
+        .find((i) => i.id === instructorId)
+        ?.subjects.find((s) => s.id === subjectId);
+
       setInstructors((prev) =>
         prev.map((i) =>
           i.id === instructorId
             ? { ...i, subjects: i.subjects.filter((s) => s.id !== subjectId) }
             : i
         )
+      );
+      showNotice(
+        removedSubject ? `Subject ${removedSubject.code} removed.` : 'Subject removed.',
+        'delete'
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to remove subject.');
@@ -133,27 +201,29 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
     return matchesSubject && matchesSearch;
   });
 
+  const isDeleteToast = noticeType === 'delete';
+
   return (
-    <div className="min-h-[calc(100vh-44px)] bg-[#f4f6f9]">
+    <div className="min-h-[calc(100vh-44px)] bg-[#eef1f7]">
       <ClamsHeader onNavigate={onNavigate} statusLabel="Computer Laboratory System" />
 
       <div className="clams-layout">
         <AdminSubNav activeScreen="admin-teacher-workload" onNavigate={onNavigate} />
 
-        <main className="space-y-5">
-          <section className="bg-white rounded-xl border border-slate-200/90 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <main className="space-y-6">
+          {/* Filter bar */}
+          <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#1b325f]/15 bg-white px-6 py-5 text-sm shadow-sm">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex items-center gap-1.5 font-semibold text-slate-500">
-                <SlidersHorizontal className="w-3.5 h-3.5" />
+              <div className="inline-flex items-center gap-2 font-bold text-[#1b325f]">
+                <SlidersHorizontal className="h-4 w-4" />
                 <span>Filters:</span>
               </div>
-
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
-                <span className="text-slate-400">Subject:</span>
+              <div className="flex items-center gap-2 rounded-lg border border-[#1b325f]/15 bg-slate-50 px-4 py-2">
+                <span className="text-slate-500">Subject:</span>
                 <select
                   value={subjectFilter}
                   onChange={(e) => setSubjectFilter(e.target.value)}
-                  className="font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
+                  className="cursor-pointer bg-transparent font-bold text-[#1b325f] focus:outline-none"
                 >
                   <option value="All Subjects">All Subjects</option>
                   {allSubjects.map((subject) => (
@@ -165,87 +235,81 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
               </div>
             </div>
 
-            <div className="relative min-w-[240px]">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <div className="relative min-w-[260px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search instructors or subjects..."
-                className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#1b325f]"
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-[#1b325f] focus:bg-white"
               />
             </div>
           </section>
 
           {error && (
-            <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
               {error}
             </p>
           )}
 
-          <section className="bg-white rounded-xl border border-slate-200/90 overflow-hidden">
+          {/* Table */}
+          <section className="overflow-hidden rounded-2xl border border-[#1b325f]/10 bg-white shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full border-collapse text-left text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-500">
-                    <th className="py-3.5 px-5">Instructor</th>
-                    <th className="py-3.5 px-4">School ID</th>
-                    <th className="py-3.5 px-4">Assigned Subjects</th>
-                    <th className="py-3.5 px-5 text-right">Schedules</th>
+                  <tr className="bg-[#1b325f] text-xs font-bold uppercase tracking-wider text-white">
+                    <th className="px-5 py-4 text-left font-semibold text-white/70">Instructor</th>
+                    <th className="px-4 py-4 text-left">School ID</th>
+                    <th className="px-4 py-4 text-left">Assigned Subjects</th>
+                    <th className="px-5 py-4 text-right font-semibold text-white/70">Schedules</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={3} className="py-10 text-center text-slate-400">
+                      <td colSpan={4} className="py-16 text-center text-sm text-slate-400">
                         Loading instructors...
                       </td>
                     </tr>
                   ) : filteredInstructors.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="py-10 text-center text-slate-400">
+                      <td colSpan={4} className="py-16 text-center text-sm text-slate-400">
                         No instructors found.
                       </td>
                     </tr>
                   ) : (
                     filteredInstructors.map((teacher) => {
                       const isExpanded = expandedId === teacher.id;
-                      const initials = teacher.name
-                        .replace(/^(Dr\.|Prof\.)\s+/, '')
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')
-                        .slice(0, 2);
-
                       const availableSubjects = allSubjects.filter(
                         (s) => !teacher.subjects.some((ts) => ts.id === s.id)
                       );
+                      const selectedSet = pendingSelections[teacher.id] ?? new Set<number>();
+                      const selectedCount = selectedSet.size;
 
                       return (
                         <React.Fragment key={teacher.id}>
                           <tr
                             onClick={() => setExpandedId(isExpanded ? null : teacher.id)}
-                            className={`cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50/40' : 'hover:bg-slate-50/80'
+                            className={`cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50/50' : 'hover:bg-slate-50'
                               }`}
                           >
-                            <td className="py-4 px-5">
+                            <td className="px-5 py-4">
                               <div className="flex items-center gap-3">
                                 {isExpanded ? (
-                                  <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+                                  <ChevronDown className="h-4 w-4 shrink-0 text-[#1b325f]" />
                                 ) : (
-                                  <ChevronUp className="w-4 h-4 text-slate-400 rotate-90 shrink-0" />
+                                  <ChevronUp className="h-4 w-4 shrink-0 rotate-90 text-slate-400" />
                                 )}
-                                <div>
-                                  <div className="font-bold text-slate-900">{teacher.name}</div>
-                                </div>
+                                <div className="font-bold text-slate-900">{teacher.name}</div>
                               </div>
                             </td>
-                            <td className="py-4 px-4 font-mono text-slate-600">
+                            <td className="px-4 py-4 font-mono text-sm text-slate-600">
                               {teacher.schoolId}
                             </td>
-                            <td className="py-4 px-4">
+                            <td className="px-4 py-4">
                               {teacher.subjects.length === 0 ? (
-                                <span className="text-slate-400 italic text-[11px]">
+                                <span className="text-xs italic text-slate-400">
                                   No subjects assigned
                                 </span>
                               ) : (
@@ -253,7 +317,7 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
                                   {teacher.subjects.map((sub) => (
                                     <span
                                       key={sub.id}
-                                      className="px-2.5 py-0.5 rounded bg-slate-100 border border-slate-200/80 text-[11px] font-medium text-slate-700 whitespace-nowrap"
+                                      className="rounded border border-slate-200 bg-slate-100 px-2.5 py-0.5 font-mono text-xs font-semibold text-slate-700"
                                     >
                                       {sub.code}
                                     </span>
@@ -261,85 +325,119 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
                                 </div>
                               )}
                             </td>
-                            <td className="py-4 px-5 text-right font-mono tabular-nums text-slate-700">
+                            <td className="px-5 py-4 text-right font-mono text-sm font-bold tabular-nums text-slate-700">
                               {teacher.scheduleCount}
                             </td>
                           </tr>
 
                           {isExpanded && (
-                            <tr className="bg-slate-50/50">
-                              <td colSpan={4} className="px-6 py-5 border-t border-slate-100">
-                                <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mb-3">
-                                  Manage Subjects for {teacher.name}
-                                </div>
-
-                                <div className="space-y-2 mb-4">
+                            <tr>
+                              <td colSpan={4} className="border-t border-slate-100 bg-slate-50/60 px-6 py-6">
+                                {/* Currently assigned */}
+                                <div className="mb-5">
+                                  <div className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    Assigned ({teacher.subjects.length})
+                                  </div>
                                   {teacher.subjects.length === 0 ? (
-                                    <p className="text-[11px] text-slate-400 italic">
-                                      This instructor has no subjects assigned yet.
-                                    </p>
+                                    <p className="text-xs italic text-slate-400">No subjects yet.</p>
                                   ) : (
-                                    teacher.subjects.map((sub) => (
-                                      <div
-                                        key={sub.id}
-                                        className="flex items-center justify-between bg-white rounded-lg border border-slate-200 px-3 py-2"
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-mono font-semibold text-slate-800 text-xs">
-                                            {sub.code}
-                                          </span>
-                                          <span className="text-[11px] text-slate-500">
-                                            {sub.title}
-                                          </span>
-                                          {sub.yearLevel != null && (
-                                            <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">
-                                              Year {sub.yearLevel}
-                                            </span>
-                                          )}
-                                        </div>
-                                        <button
-                                          onClick={() => handleUnassign(teacher.id, sub.id)}
-                                          disabled={busy}
-                                          className="p-1.5 hover:bg-rose-50 rounded cursor-pointer disabled:opacity-50"
-                                          title="Remove"
+                                    <div className="space-y-1.5">
+                                      {teacher.subjects.map((sub) => (
+                                        <div
+                                          key={sub.id}
+                                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2"
                                         >
-                                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                                        </button>
-                                      </div>
-                                    ))
+                                          <div className="flex min-w-0 items-center gap-3">
+                                            <span className="font-mono text-sm font-bold text-slate-800">
+                                              {sub.code}
+                                            </span>
+                                            <span className="truncate text-xs text-slate-500">
+                                              {sub.title}
+                                            </span>
+                                          </div>
+                                          <button
+                                            onClick={() => void handleUnassign(teacher.id, sub.id)}
+                                            disabled={busy}
+                                            className="rounded p-1.5 text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+                                            title="Remove subject"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
                                   )}
                                 </div>
 
-                                <div className="flex items-center gap-2">
-                                  <select
-                                    value={pendingSubject[teacher.id] ?? ''}
-                                    onChange={(e) =>
-                                      setPendingSubject((prev) => ({
-                                        ...prev,
-                                        [teacher.id]: e.target.value ? Number(e.target.value) : '',
-                                      }))
-                                    }
-                                    disabled={availableSubjects.length === 0}
-                                    className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:border-[#1b325f] disabled:opacity-60"
-                                  >
-                                    <option value="">
-                                      {availableSubjects.length === 0
-                                        ? 'All subjects already assigned'
-                                        : 'Select a subject to add...'}
-                                    </option>
-                                    {availableSubjects.map((s) => (
-                                      <option key={s.id} value={s.id}>
-                                        {s.code} — {s.title}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <button
-                                    onClick={() => handleAssign(teacher.id)}
-                                    disabled={busy || !pendingSubject[teacher.id]}
-                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#2563eb] hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
-                                  >
-                                    <Plus className="w-3.5 h-3.5" /> Assign
-                                  </button>
+                                {/* Available subjects — compact checkbox list */}
+                                <div>
+                                  <div className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    Add subjects
+                                  </div>
+                                  {availableSubjects.length === 0 ? (
+                                    <p className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-xs italic text-slate-400">
+                                      All subjects are already assigned.
+                                    </p>
+                                  ) : (
+                                    <>
+                                      <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+                                        {availableSubjects.map((s) => {
+                                          const checked = selectedSet.has(s.id);
+                                          return (
+                                            <label
+                                              key={s.id}
+                                              className={`flex cursor-pointer items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-b-0 transition-colors ${checked ? 'bg-blue-50/60' : 'hover:bg-slate-50'
+                                                }`}
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={() => togglePending(teacher.id, s.id)}
+                                                className="h-4 w-4 shrink-0 cursor-pointer accent-[#2563eb]"
+                                              />
+                                              <span className="w-20 shrink-0 font-mono text-sm font-bold text-slate-800">
+                                                {s.code}
+                                              </span>
+                                              <span className="truncate text-xs text-slate-600">
+                                                {s.title}
+                                              </span>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+
+                                      <div className="mt-4 flex items-center justify-between gap-3">
+                                        <span className="text-xs text-slate-500">
+                                          {selectedCount === 0
+                                            ? ''
+                                            : `${selectedCount} selected`}
+                                        </span>
+                                        <div className="flex items-center gap-3">
+                                          <button
+                                            type="button"
+                                            onClick={() => clearPending(teacher.id)}
+                                            disabled={busy || selectedCount === 0}
+                                            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                                          >
+                                            Clear
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => void handleAssignAll(teacher.id)}
+                                            disabled={busy || selectedCount === 0}
+                                            className={PRIMARY_BTN}
+                                          >
+                                            <Plus className="h-4 w-4" />
+                                            {busy
+                                              ? 'Assigning...'
+                                              : selectedCount <= 1
+                                                ? 'Assign subject'
+                                                : `Assign ${selectedCount} subjects`}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -351,9 +449,40 @@ export const AdminTeacherWorkloadView: React.FC<AdminTeacherWorkloadProps> = ({
                 </tbody>
               </table>
             </div>
+
+            {!loading && filteredInstructors.length > 0 && (
+              <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3 text-xs text-slate-500">
+                {filteredInstructors.length} instructor{filteredInstructors.length === 1 ? '' : 's'}
+              </div>
+            )}
           </section>
         </main>
       </div>
+
+      {/* Toast */}
+      {successNotice && (
+        <div className="fixed right-6 top-6 z-[60] animate-toast-in">
+          <div
+            className={`flex items-center gap-3 overflow-hidden rounded-xl border bg-white px-5 py-4 shadow-2xl ${isDeleteToast ? 'border-rose-200' : 'border-emerald-200'
+              }`}
+          >
+            <div className="min-w-0">
+              <div className={`text-xs font-bold uppercase tracking-wider ${isDeleteToast ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {isDeleteToast ? 'Removed' : 'Success'}
+              </div>
+              <div className="mt-0.5 text-sm text-slate-700">{successNotice}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSuccessNotice('')}
+              className="ml-2 rounded-md p-1 text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-500"
+              aria-label="Dismiss"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

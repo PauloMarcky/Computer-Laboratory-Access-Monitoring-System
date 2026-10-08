@@ -1,9 +1,30 @@
 const prisma = require('../config/db');
 const { toId } = require('../utils/helpers');
 
+// GET /api/subjects?includeArchived=true
 async function listSubjects(req, res) {
-  const subjects = await prisma.subject.findMany({ orderBy: { code: 'asc' } });
+  const includeArchived = req.query.includeArchived === 'true';
+  const subjects = await prisma.subject.findMany({
+    where: includeArchived ? {} : { isActive: true },
+    orderBy: { code: 'asc' },
+  });
   return res.json({ subjects });
+}
+
+// GET /api/subjects/:id/usage
+async function getSubjectUsage(req, res) {
+  const id = toId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid id.' });
+
+  const subject = await prisma.subject.findUnique({ where: { id } });
+  if (!subject) return res.status(404).json({ error: 'Subject not found.' });
+
+  const [scheduleCount, instructorCount] = await Promise.all([
+    prisma.schedule.count({ where: { subjectCode: subject.code } }),
+    prisma.instructorSubject.count({ where: { subjectId: id } }),
+  ]);
+
+  return res.json({ scheduleCount, instructorCount });
 }
 
 async function createSubject(req, res) {
@@ -21,7 +42,17 @@ async function createSubject(req, res) {
     });
     return res.status(201).json({ subject });
   } catch (e) {
-    if (e.code === 'P2002') return res.status(409).json({ error: 'That subject code already exists.' });
+    if (e.code === 'P2002') {
+      const existing = await prisma.subject.findUnique({
+        where: { code: code.trim().toUpperCase() },
+      });
+      if (existing && !existing.isActive) {
+        return res.status(409).json({
+          error: 'That subject code already exists (archived). Restore it instead of creating a new one.',
+        });
+      }
+      return res.status(409).json({ error: 'That subject code already exists.' });
+    }
     throw e;
   }
 }
@@ -38,11 +69,56 @@ async function updateSubject(req, res) {
   return res.json({ subject });
 }
 
+// DELETE /api/subjects/:id
+//
+// Archives the subject (isActive = false) AND hard-deletes all its schedules.
+// Deleting a schedule cascades to enrollments, sessions, attendance, PC records.
 async function deleteSubject(req, res) {
   const id = toId(req.params.id);
   if (!id) return res.status(400).json({ error: 'Invalid id.' });
-  await prisma.subject.delete({ where: { id } });
-  return res.status(204).send();
+
+  const subject = await prisma.subject.findUnique({ where: { id } });
+  if (!subject) return res.status(404).json({ error: 'Subject not found.' });
+
+  const result = await prisma.$transaction(async (tx) => {
+    const deleted = await tx.schedule.deleteMany({
+      where: { subjectCode: subject.code },
+    });
+    await tx.subject.update({
+      where: { id },
+      data: { isActive: false },
+    });
+    return { deletedSchedules: deleted.count };
+  });
+
+  return res.json({
+    archived: true,
+    deletedSchedules: result.deletedSchedules,
+  });
 }
 
-module.exports = { listSubjects, createSubject, updateSubject, deleteSubject };
+// PATCH /api/subjects/:id/restore
+async function restoreSubject(req, res) {
+  const id = toId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid id.' });
+
+  const subject = await prisma.subject.findUnique({ where: { id } });
+  if (!subject) return res.status(404).json({ error: 'Subject not found.' });
+  if (subject.isActive) return res.status(400).json({ error: 'Subject is already active.' });
+
+  await prisma.subject.update({
+    where: { id },
+    data: { isActive: true },
+  });
+
+  return res.json({ restored: true });
+}
+
+module.exports = {
+  listSubjects,
+  getSubjectUsage,
+  createSubject,
+  updateSubject,
+  deleteSubject,
+  restoreSubject,
+};

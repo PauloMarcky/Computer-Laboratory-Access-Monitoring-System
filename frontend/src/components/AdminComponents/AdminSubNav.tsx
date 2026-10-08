@@ -39,7 +39,7 @@ export const AdminSubNav: React.FC<AdminSubNavProps> = ({ activeScreen, onNaviga
   const isAnalytics = activeScreen === 'admin-students-analytics';
 
   const itemClass = (isActive: boolean) =>
-    `flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-semibold transition-colors ${isActive
+    `flex w-full items-center gap-3 rounded-lg px-4 py-5 text-left text-m font-semibold transition-colors ${isActive
       ? 'bg-[#e8eef8] text-[#1b325f]'
       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
     }`;
