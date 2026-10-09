@@ -58,13 +58,13 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
     <div className="min-h-[calc(100vh-44px)] bg-[#f4f6f9]">
       <ClamsHeader onNavigate={onNavigate} statusLabel="Computer Laboratory System" onLogout={onLogout} />
 
-      <main className="max-w-3xl mx-auto px-6 py-8">
+      <main className="px-4 py-6 sm:py-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
               {canSubmitIssue ? 'Report a PC Issue' : 'My PC Reports'}
             </h1>
-            <p className="text-xs text-slate-500 mt-1 font-mono tabular-nums">
+            <p className="text-base text-slate-500 mt-1 font-mono tabular-nums">
               {selectedPc ? `PC-${selectedPc}` : 'No PC selected'}
             </p>
           </div>
@@ -72,19 +72,19 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
           <button
             type="button"
             onClick={() => onNavigate('student-claim-pc')}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-[#1b325f] cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#1b325f] cursor-pointer"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft className="w-4 h-4" />
             <span>Back to Seat Claim</span>
           </button>
         </div>
 
         {canSubmitIssue && <form
           onSubmit={handleSubmit}
-          className="mt-6 bg-white rounded-xl border border-slate-200/90 p-6 space-y-5"
+          className="mt-6 bg-white rounded-xl border border-slate-200/90 p-4 space-y-5 sm:p-6"
         >
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2.5">
+            <label className="block text-sm font-bold text-slate-700 mb-2.5">
               Issue Category
             </label>
             <div className="flex flex-wrap items-center gap-2">
@@ -98,7 +98,7 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
                       setSelectedCategory(category);
                       setSubmittedSuccess(false);
                     }}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer whitespace-nowrap ${active
+                    className={`px-3.5 py-2 rounded-lg text-sm font-semibold border transition-colors cursor-pointer whitespace-nowrap ${active
                       ? 'bg-[#1b325f] border-[#1b325f] text-white shadow-2xs'
                       : 'bg-slate-50/80 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                       }`}
@@ -113,7 +113,7 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
           <div>
             <label
               htmlFor="issue-description"
-              className="block text-xs font-bold text-slate-700 mb-2"
+              className="block text-sm font-bold text-slate-700 mb-2"
             >
               Describe the issue
             </label>
@@ -127,24 +127,24 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
                 setSubmittedSuccess(false);
               }}
               placeholder="e.g. Left click doesn't register"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50/40 p-3.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-[#1b325f] transition-colors resize-none"
+              className="w-full rounded-lg border border-slate-200 bg-slate-50/40 p-4 text-base text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-[#1b325f] transition-colors resize-none"
             />
           </div>
 
           <button
             type="submit"
             disabled={!selectedPc || !description.trim() || submitting}
-            className="w-full py-3.5 px-6 rounded-lg bg-[#1b325f] hover:bg-[#142547] text-white font-semibold text-xs transition-colors cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full py-3.5 px-6 rounded-lg bg-[#1b325f] hover:bg-[#142547] text-white font-semibold text-sm transition-colors cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? 'Submitting...' : 'Submit Report'}
           </button>
 
-          {error && <p className="text-xs text-rose-700">{error}</p>}
+          {error && <p className="text-sm text-rose-700">{error}</p>}
 
           {submittedSuccess && (
-            <div className="flex items-center justify-between gap-3 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-xs text-emerald-800">
+            <div className="flex flex-col gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                 <span>Issue report recorded for this session against PC-{selectedPc}.</span>
               </div>
               <button
@@ -161,12 +161,12 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
         {reports.length > 0 ? (
           <div className="mt-6 bg-white rounded-xl border border-slate-200/80 p-4">
             <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="text-xs font-bold text-slate-700">
+              <div className="text-base font-bold text-slate-700">
                 My Reports ({reports.length})
               </div>
-              <span className="text-[11px] text-slate-500">Updated by lab staff</span>
+              <span className="text-sm text-slate-500">Updated by lab staff</span>
             </div>
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-base">
               {reports.map((report) => (
                 <div key={report.id} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -175,7 +175,7 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
                       <span className="text-slate-300">·</span>
                       <span className="font-semibold text-slate-700">{report.category}</span>
                     </div>
-                    <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${report.status === 'RESOLVED'
+                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${report.status === 'RESOLVED'
                       ? 'bg-emerald-100 text-emerald-700'
                       : report.status === 'REJECTED'
                         ? 'bg-rose-100 text-rose-700'
@@ -186,15 +186,15 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
                     </span>
                   </div>
 
-                  <div className="mt-2 text-[11px] text-slate-600 font-medium">
+                  <div className="mt-2 text-sm text-slate-600 font-medium">
                     {report.subjectCode || 'Subject'} • {report.classDay || 'Day'} • {report.classTimeRange || 'Time'}
                   </div>
 
                   <p className="mt-2 text-slate-600">{report.description}</p>
-                  <p className="mt-2 text-[11px] text-slate-500">Submitted {report.submittedAt}</p>
+                  <p className="mt-2 text-sm text-slate-500">Submitted {report.submittedAt}</p>
 
                   <div className="mt-2 rounded-md border border-slate-200 bg-white px-3 py-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
                       Custodian update
                     </div>
                     {report.custodianReport ? (
@@ -208,7 +208,7 @@ export const StudentReportIssueView: React.FC<StudentReportIssueProps> = ({
             </div>
           </div>
         ) : (
-          <div className="mt-6 bg-white rounded-xl border border-dashed border-slate-200 p-5 text-center text-xs text-slate-500">
+          <div className="mt-6 bg-white rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-500">
             No reports submitted yet. Once you submit a lab issue, it will appear here with the latest custodian update.
           </div>
         )}

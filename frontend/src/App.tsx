@@ -659,7 +659,7 @@ export default function App() {
       setStudentTimedIn(attendanceData.attendance.some((row) => row.activeSessionId === activeSession.id && !row.timeOut));
       const ownOccupancy = occupancyData.occupancy;
       setStudentOccupancyId(ownOccupancy?.id ?? null);
-      setSelectedPc(ownOccupancy?.pcNumber.replace(/^PC-/, '') ?? '');
+      setSelectedPc((prev) => (ownOccupancy ? ownOccupancy.pcNumber.replace(/^PC-/, '') : prev));
       setIsClaimedConfirmed(Boolean(ownOccupancy));
 
       const occupied = new Set(availabilityData.occupancies.map((occupancy) => occupancy.pcNumber));
@@ -847,7 +847,7 @@ export default function App() {
         setStudentTimedIn(attendanceData.attendance.some((row) => row.activeSessionId === activeSession.id && !row.timeOut));
         const ownOccupancy = occupancyData.occupancy;
         setStudentOccupancyId(ownOccupancy?.id ?? null);
-        setSelectedPc(ownOccupancy?.pcNumber.replace(/^PC-/, '') ?? '');
+        setSelectedPc((prev) => (ownOccupancy ? ownOccupancy.pcNumber.replace(/^PC-/, '') : prev));
         const occupied = new Set(availabilityData.occupancies.map((occupancy) => occupancy.pcNumber));
         const capacity = Math.max(0, activeSession.schedule.labRoom.capacity ?? 0);
         setPcStations(Array.from({ length: capacity }, (_, index) => {

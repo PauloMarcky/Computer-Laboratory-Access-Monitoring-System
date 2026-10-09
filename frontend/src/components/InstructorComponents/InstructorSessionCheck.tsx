@@ -64,17 +64,17 @@ export const InstructorSessionCheck = ({ schedules, onStartAttendance, onNavigat
         logoutTitle="End active session?"
         logoutMessage="This active class session will be ended automatically before you return to role selection."
       />
-      <main className="mx-auto max-w-5xl px-6 py-8">
+      <main className="px-4 py-8">
         <div className="mb-7 max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Instructor access</p>
-          <h1 className="mt-2 text-2xl font-bold text-slate-900">Check your scheduled class</h1>
+          <p className="text-sm font-semibold uppercase tracking-wide text-amber-700">Instructor access</p>
+          <h1 className="mt-2 text-3xl font-bold text-slate-900">Check your scheduled class</h1>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
           <form onSubmit={handleCheck} className="space-y-5 rounded-lg border border-slate-200 bg-white p-6">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
               <CalendarClock className="h-5 w-5 text-[#1b325f]" aria-hidden="true" />
-              <h2 className="text-sm font-bold text-slate-900">Class details</h2>
+              <h2 className="text-base font-bold text-slate-900">Class details</h2>
             </div>
 
             <label className="block text-sm font-medium text-slate-700">
@@ -97,7 +97,7 @@ export const InstructorSessionCheck = ({ schedules, onStartAttendance, onNavigat
               </select>
             </label>
 
-            <p className="text-xs text-slate-500">Current computer time: {currentTimeLabel}</p>
+            <p className="text-sm text-slate-500">Current computer time: {currentTimeLabel}</p>
 
             <button
               type="submit"
@@ -111,22 +111,22 @@ export const InstructorSessionCheck = ({ schedules, onStartAttendance, onNavigat
           <aside className="rounded-lg border border-slate-200 bg-white p-6" aria-live="polite">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
               <BookOpenCheck className="h-5 w-5 text-amber-700" aria-hidden="true" />
-              <h2 className="text-sm font-bold text-slate-900">Session status</h2>
+              <h2 className="text-base font-bold text-slate-900">Session status</h2>
             </div>
 
             {!hasChecked && (
-              <p className="mt-5 text-sm leading-6 text-slate-600">
+              <p className="mt-5 text-base leading-6 text-slate-600">
                 Enter the class details to verify the schedule and unlock attendance.
               </p>
             )}
 
             {hasChecked && matchedSchedule && (
               <div className="mt-5">
-                <p className="text-sm font-semibold text-emerald-800">Scheduled class confirmed</p>
-                <dl className="mt-4 space-y-3 text-sm">
-                  <div><dt className="text-xs text-slate-500">Subject</dt><dd className="font-medium text-slate-900">{matchedSchedule.subject}</dd></div>
-                  <div><dt className="text-xs text-slate-500">Schedule</dt><dd className="font-medium text-slate-900">{matchedSchedule.day}, {matchedSchedule.startTime} - {matchedSchedule.endTime}</dd></div>
-                  <div><dt className="text-xs text-slate-500">Room</dt><dd className="font-medium text-slate-900">{matchedSchedule.room || 'Not specified'}</dd></div>
+                <p className="text-base font-semibold text-emerald-800">Scheduled class confirmed</p>
+                <dl className="mt-4 space-y-3 text-base">
+                  <div><dt className="text-sm text-slate-500">Subject</dt><dd className="font-medium text-slate-900">{matchedSchedule.subject}</dd></div>
+                  <div><dt className="text-sm text-slate-500">Schedule</dt><dd className="font-medium text-slate-900">{matchedSchedule.day}, {matchedSchedule.startTime} - {matchedSchedule.endTime}</dd></div>
+                  <div><dt className="text-sm text-slate-500">Room</dt><dd className="font-medium text-slate-900">{matchedSchedule.room || 'Not specified'}</dd></div>
                 </dl>
                 <button
                   type="button"
@@ -146,12 +146,12 @@ export const InstructorSessionCheck = ({ schedules, onStartAttendance, onNavigat
                 >
                   {starting ? 'Starting session...' : 'Open attendance'} <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </button>
-                {startError && <p className="mt-3 text-xs text-rose-700">{startError}</p>}
+                {startError && <p className="mt-3 text-sm text-rose-700">{startError}</p>}
               </div>
             )}
 
             {hasChecked && !matchedSchedule && (
-              <div className="mt-5 flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+              <div className="mt-5 flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-base leading-6 text-amber-900">
                 <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 <p>
                   {schedules.length === 0

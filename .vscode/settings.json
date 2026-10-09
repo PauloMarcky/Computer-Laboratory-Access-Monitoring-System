@@ -1,4 +1,28 @@
 {
   "git.ignoreLimitWarning": true,
-  "prisma.pinToPrisma6": true
+  "prisma.pinToPrisma6": true,
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/.jj": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    ".brud": true
+  },
+  "files.watcherExclude": {
+    ".git/objects/**": true,
+    ".git/subtree-cache/**": true,
+    ".hg/store/**": true,
+    "*/.git/objects/**": true,
+    "*/.git/subtree-cache/**": true,
+    "*/.hg/store/**": true,
+    ".brud": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/*.code-search": true,
+    ".brud": true
+  }
 }

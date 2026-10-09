@@ -58,11 +58,11 @@ class ScannerBoundary extends React.Component<
       return (
         <div className="w-full h-60 rounded-xl border-2 border-dashed border-rose-200 bg-rose-50/50 flex flex-col items-center justify-center p-4 text-center">
           <CameraOff className="w-8 h-8 mb-2 text-rose-400" />
-          <span className="text-xs text-rose-600 font-semibold">Scanner unavailable</span>
+          <span className="text-sm text-rose-600 font-semibold">Scanner unavailable</span>
           <button
             type="button"
             onClick={() => this.setState({ failed: false })}
-            className="mt-2 text-[11px] text-[#1b325f] underline cursor-pointer"
+            className="mt-2 text-xs text-[#1b325f] underline cursor-pointer"
           >
             Retry
           </button>
@@ -299,7 +299,7 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, scheduleId, 
     return (
       <div className="w-full h-60 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 opacity-60 flex flex-col items-center justify-center">
         <CameraOff className="w-8 h-8 mb-2 text-slate-400" />
-        <span className="text-[11px] text-slate-400">
+        <span className="text-sm text-slate-400">
           {activeSessionId ? 'Resume class session to enable scanning' : 'Start a verified session to enable scanning'}
         </span>
       </div>
@@ -344,34 +344,34 @@ const CameraScannerInner: React.FC<CameraScannerProps> = ({ active, scheduleId, 
               <XCircle className="w-7 h-7 shrink-0" />
             )}
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-wider opacity-90">
+              <div className="text-xs font-semibold uppercase tracking-wider opacity-90">
                 {feedback.title}
               </div>
               {feedback.name && (
-                <div className="text-base font-bold leading-tight truncate">{feedback.name}</div>
+                <div className="text-lg font-bold leading-tight truncate">{feedback.name}</div>
               )}
               {feedback.studentId && (
-                <div className="text-xs opacity-95 truncate">
+                <div className="text-sm opacity-95 truncate">
                   {feedback.studentId}
                   {feedback.course ? ` · ${feedback.course}` : ''}
                 </div>
               )}
               {feedback.timeIn && (
-                <div className="text-xs font-semibold mt-0.5">Time In: {feedback.timeIn}</div>
+                <div className="text-sm font-semibold mt-0.5">Time In: {feedback.timeIn}</div>
               )}
               {feedback.detail && (
-                <div className="text-xs opacity-95 truncate">{feedback.detail}</div>
+                <div className="text-sm opacity-95 truncate">{feedback.detail}</div>
               )}
             </div>
           </div>
         )}
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-xs text-white p-4 text-center">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-sm text-white p-4 text-center">
             {error}
           </div>
         )}
       </div>
-      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500">
+      <div className="mt-2 flex items-center gap-1.5 text-sm text-slate-500">
         <Camera className="w-3.5 h-3.5 shrink-0" />
         <span>{status}</span>
       </div>

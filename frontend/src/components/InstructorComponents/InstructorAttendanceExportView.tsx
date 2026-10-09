@@ -77,13 +77,13 @@ export const InstructorAttendanceExportView = ({
 
   return (
     <div className="min-h-[calc(100vh-44px)] bg-white py-8 px-6">
-      <div className="max-w-4xl mx-auto mb-6 flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200 no-print">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200 no-print">
         <button
           type="button"
           onClick={() => {
             onBackToSchedule();
           }}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-[#1b325f] cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-[#1b325f] cursor-pointer"
         >
           <ArrowLeft className="w-6 h-6" />
           <span className="text-sm md:text-base">Back to Schedule</span>
@@ -93,7 +93,7 @@ export const InstructorAttendanceExportView = ({
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-[#1b325f] hover:bg-[#142547] text-white text-xs font-semibold cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-[#1b325f] hover:bg-[#142547] text-white text-sm font-semibold cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Print</span>
@@ -102,7 +102,7 @@ export const InstructorAttendanceExportView = ({
           <button
             type="button"
             onClick={handleSaveAsPdf}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-sm font-semibold cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Save as PDF</span>
@@ -110,22 +110,22 @@ export const InstructorAttendanceExportView = ({
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto bg-white px-4 sm:px-8 py-6">
+      <div className="bg-white px-4 sm:px-6 py-6">
         <div className="text-center border-b-2 border-slate-800 pb-3 mb-4">
-          <h1 className="text-base font-bold tracking-wide text-slate-900 uppercase">
+          <h1 className="text-lg font-bold tracking-wide text-slate-900 uppercase">
             UNIVERSITY OF LA SALETTE, INC.
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">Santiago City, Isabela</p>
-          <p className="text-xs font-bold tracking-wider text-slate-800 uppercase mt-3">
+          <p className="text-sm text-slate-500 mt-0.5">Santiago City, Isabela</p>
+          <p className="text-sm font-bold tracking-wider text-slate-800 uppercase mt-3">
             COLLEGE OF INFORMATION TECHNOLOGY — COMPUTER LAB ATTENDANCE LOG
           </p>
         </div>
 
-        <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 no-print">
+        <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 no-print">
           Choose <span className="font-semibold">Save as PDF</span> in the browser print dialog to save the attendance log as a PDF file.
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-800 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-slate-800 mb-5">
           <div className="space-y-1">
             <div><span className="font-bold">Subject Code:</span> —</div>
             <div><span className="font-bold">Laboratory Room:</span> —</div>
@@ -139,7 +139,7 @@ export const InstructorAttendanceExportView = ({
         </div>
 
         <div className="overflow-x-auto border border-slate-300">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-[#1b325f] text-white font-semibold">
                 <th className="py-2.5 px-3 border-r border-slate-600/40 w-10">#</th>
@@ -177,14 +177,14 @@ export const InstructorAttendanceExportView = ({
           </table>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-12 mt-16 pt-4 text-center text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-12 mt-16 pt-4 text-center text-sm">
           <div className="max-w-xs mx-auto w-full">
             <div className="border-t border-slate-700 pt-2 font-bold text-slate-900">—</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Class Instructor Signature &amp; Date</div>
+            <div className="text-xs text-slate-500 mt-0.5">Class Instructor Signature &amp; Date</div>
           </div>
           <div className="max-w-xs mx-auto w-full">
             <div className="border-t border-slate-700 pt-2 font-bold text-slate-900">Dean of IT</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Department Dean / Verifier (If Required)</div>
+            <div className="text-xs text-slate-500 mt-0.5">Department Dean / Verifier (If Required)</div>
           </div>
         </div>
       </div>

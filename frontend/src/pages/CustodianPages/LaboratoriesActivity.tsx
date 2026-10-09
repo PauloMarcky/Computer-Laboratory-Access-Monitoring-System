@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, CheckCircle2, ChevronDown, Clock, Download, Monitor, Search, User, Users, Wrench } from 'lucide-react';
+import { BookOpen, CheckCircle2, ChevronDown, Clock, Download, Monitor, Search, User, Users } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { ClamsHeader } from '../../components/ClamsHeader';
 import { LabStaffSubNav } from '../../components/CustodianComponents/LabStaffSubNav';
@@ -374,7 +374,6 @@ export const LabStaffRoomsView: React.FC<LabStaffRoomsProps> = ({ rooms, onNavig
 
   const inUseRooms = rooms.filter((r) => r.status === 'IN USE');
   const availableRooms = rooms.filter((r) => r.status === 'AVAILABLE');
-  const maintenanceRooms = rooms.filter((r) => r.status === 'MAINTENANCE');
 
   const visibleRooms = statusFilter === 'IN USE' ? inUseRooms : rooms;
 
@@ -394,7 +393,7 @@ export const LabStaffRoomsView: React.FC<LabStaffRoomsProps> = ({ rooms, onNavig
           </div>
 
           {/* KPI cards */}
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <button
               type="button"
               onClick={() => setStatusFilter('IN USE')}
@@ -420,20 +419,6 @@ export const LabStaffRoomsView: React.FC<LabStaffRoomsProps> = ({ rooms, onNavig
               <div>
                 <div className="font-mono text-2xl font-bold tabular-nums text-[#1b325f]">{availableRooms.length}</div>
                 <div className="text-sm text-slate-500">Available Now</div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setStatusFilter('ALL')}
-              className="flex cursor-pointer items-center gap-4 rounded-2xl border border-[#1b325f]/10 bg-white p-5 text-left shadow-sm transition-all hover:border-amber-300 hover:shadow-md"
-            >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-amber-100 text-amber-600">
-                <Wrench className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="font-mono text-2xl font-bold tabular-nums text-[#1b325f]">{maintenanceRooms.length}</div>
-                <div className="text-sm text-slate-500">Under Maintenance</div>
               </div>
             </button>
           </div>
@@ -484,9 +469,7 @@ export const LabStaffRoomsView: React.FC<LabStaffRoomsProps> = ({ rooms, onNavig
                       </div>
                     ) : (
                       <div className="py-6 text-sm text-slate-400">
-                        {isAvailable
-                          ? 'No active class scheduled right now.'
-                          : 'Hardware diagnostics in progress.'}
+                        No active class scheduled right now.
                       </div>
                     )}
                   </div>
