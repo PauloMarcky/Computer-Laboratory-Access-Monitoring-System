@@ -405,16 +405,16 @@ export default function App() {
   const [activeInstructorSchedule, setActiveInstructorSchedule] = useState<ScheduleEntry | null>(null);
   const [rosterSchedule, setRosterSchedule] = useState<ScheduleEntry | null>(getInitialRosterSchedule);
   const [adminToken, setAdminToken] = useState(
-    () => localStorage.getItem('clams.adminToken') || ''
+    () => sessionStorage.getItem('clams.adminToken') || ''
   );
   const [instructorToken, setInstructorToken] = useState(
-    () => localStorage.getItem('clams.instructorToken') || ''
+    () => sessionStorage.getItem('clams.instructorToken') || ''
   );
   const [studentToken, setStudentToken] = useState(
-    () => localStorage.getItem('clams.studentToken') || ''
+    () => sessionStorage.getItem('clams.studentToken') || ''
   );
   const [custodianToken, setCustodianToken] = useState(
-    () => localStorage.getItem('clams.custodianToken') || ''
+    () => sessionStorage.getItem('clams.custodianToken') || ''
   );
   const [activeInstructorSessionId, setActiveInstructorSessionId] = useState('');
   const [studentSessions, setStudentSessions] = useState<ApiSession[]>([]);
@@ -428,7 +428,7 @@ export default function App() {
   const [labRooms, setLabRooms] = useState<LabRoomStatus[]>([]);
 
   useEffect(() => {
-    localStorage.setItem(LAST_SCREEN_STORAGE_KEY, currentScreen);
+    sessionStorage.setItem(LAST_SCREEN_STORAGE_KEY, currentScreen);
   }, [currentScreen]);
 
   useEffect(() => {
@@ -442,7 +442,7 @@ export default function App() {
 
   useEffect(() => {
     const role = getScreenRole(currentScreen);
-    if (role && !localStorage.getItem(roleTokenStorageKeys[role])) {
+    if (role && !sessionStorage.getItem(roleTokenStorageKeys[role])) {
       setCurrentScreen(roleLoginScreens[role]);
     }
   }, [currentScreen]);
@@ -464,7 +464,7 @@ export default function App() {
           ? await fetch(`${API_BASE_URL}/sessions/reports`, { headers })
           : null;
         if ([response, historyResponse].some((item) => item && (item.status === 401 || item.status === 403))) {
-          localStorage.removeItem(roleTokenStorageKeys[role]);
+          sessionStorage.removeItem(roleTokenStorageKeys[role]);
           if (role === 'ADMIN') setAdminToken('');
           else setCustodianToken('');
           setCurrentScreen('login-portal');
@@ -502,7 +502,7 @@ export default function App() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.status === 401 || response.status === 403) {
-        localStorage.removeItem('clams.instructorToken');
+        sessionStorage.removeItem('clams.instructorToken');
         setInstructorToken('');
         setCurrentScreen('login-portal');
         return;
@@ -518,7 +518,7 @@ export default function App() {
         if (!schedulesResponse.ok) throw new Error(schedulesResult.error || 'Unable to restore your class schedule.');
         setSchedules(schedulesResult.schedules.map(mapApiSchedule));
 
-        if (localStorage.getItem(LAST_SCREEN_STORAGE_KEY) === 'instructor-attendance-export') {
+        if (sessionStorage.getItem(LAST_SCREEN_STORAGE_KEY) === 'instructor-attendance-export') {
           const savedAttendance = sessionStorage.getItem(INSTRUCTOR_ATTENDANCE_STORAGE_KEY);
           if (savedAttendance) {
             const restoredAttendance = JSON.parse(savedAttendance) as AttendanceEntry[];
@@ -582,7 +582,7 @@ export default function App() {
         status: getAttendanceStatus(new Date(item.timeIn), restoredSchedule.startTime, restoredSchedule.endTime),
       })));
 
-      setCurrentScreen(localStorage.getItem(LAST_SCREEN_STORAGE_KEY) === 'instructor-attendance-export'
+      setCurrentScreen(sessionStorage.getItem(LAST_SCREEN_STORAGE_KEY) === 'instructor-attendance-export'
         ? 'instructor-attendance-export'
         : 'instructor-attendance-module');
     } catch (error) {
@@ -611,8 +611,8 @@ export default function App() {
         fetch(`${API_BASE_URL}/pc-issues/me`, { headers }),
       ]);
       if ([response, issuesResponse].some((item) => item.status === 401 || item.status === 403)) {
-        localStorage.removeItem('clams.studentToken');
-        localStorage.removeItem('clams.studentSchoolId');
+        sessionStorage.removeItem('clams.studentToken');
+        sessionStorage.removeItem('clams.studentSchoolId');
         setStudentToken('');
         setCurrentScreen('login-portal');
         return;
@@ -627,7 +627,7 @@ export default function App() {
       const activeSession = sessions[0] ?? null;
       setStudentSessions(sessions);
       setActiveStudentSessionId(activeSession ? String(activeSession.id) : '');
-      const studentId = localStorage.getItem('clams.studentSchoolId') || currentStudentId || '';
+      const studentId = sessionStorage.getItem('clams.studentSchoolId') || currentStudentId || '';
       if (studentId) setCurrentStudentId(studentId);
       if (!activeSession) {
         setStudentTimedIn(false);
@@ -682,13 +682,13 @@ export default function App() {
   };
 
   useEffect(() => {
-    const savedInstructorToken = localStorage.getItem('clams.instructorToken');
+    const savedInstructorToken = sessionStorage.getItem('clams.instructorToken');
     if (savedInstructorToken) {
       setInstructorToken(savedInstructorToken);
       void restoreInstructorSessionState(savedInstructorToken);
     }
 
-    const savedStudentToken = localStorage.getItem('clams.studentToken');
+    const savedStudentToken = sessionStorage.getItem('clams.studentToken');
     if (savedStudentToken) {
       setStudentToken(savedStudentToken);
       void restoreStudentSessionState(savedStudentToken);
@@ -888,35 +888,35 @@ export default function App() {
     }
 
     if (expectedRole === 'ADMIN') {
-      localStorage.setItem('clams.adminToken', result.token);
+      sessionStorage.setItem('clams.adminToken', result.token);
       setAdminToken(result.token);
     } else {
-      localStorage.removeItem('clams.adminToken');
+      sessionStorage.removeItem('clams.adminToken');
       setAdminToken('');
     }
 
     if (expectedRole === 'INSTRUCTOR') {
-      localStorage.setItem('clams.instructorToken', result.token);
+      sessionStorage.setItem('clams.instructorToken', result.token);
       setInstructorToken(result.token);
       await cleanupActiveInstructorSession(result.token);
     } else {
-      localStorage.removeItem('clams.instructorToken');
+      sessionStorage.removeItem('clams.instructorToken');
       setInstructorToken('');
     }
 
     if (expectedRole === 'STUDENT') {
-      localStorage.setItem('clams.studentToken', result.token);
-      localStorage.setItem('clams.studentSchoolId', schoolId);
+      sessionStorage.setItem('clams.studentToken', result.token);
+      sessionStorage.setItem('clams.studentSchoolId', schoolId);
       setStudentToken(result.token);
     } else {
-      localStorage.removeItem('clams.studentToken');
-      localStorage.removeItem('clams.studentSchoolId');
+      sessionStorage.removeItem('clams.studentToken');
+      sessionStorage.removeItem('clams.studentSchoolId');
       setStudentToken('');
     }
     if (expectedRole === 'CUSTODIAN') {
-      localStorage.setItem('clams.custodianToken', result.token);
+      sessionStorage.setItem('clams.custodianToken', result.token);
     } else {
-      localStorage.removeItem('clams.custodianToken');
+      sessionStorage.removeItem('clams.custodianToken');
     }
     setCustodianToken(expectedRole === 'CUSTODIAN' ? result.token : '');
     setActiveInstructorSchedule(null);
@@ -1050,7 +1050,7 @@ export default function App() {
         fetch(`${API_BASE_URL}/attendance/session/${sessionId}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch(`${API_BASE_URL}/pc-occupancy/session/${sessionId}`, {
+        fetch(`${API_BASE_URL}/pc-occupancy/session/${sessionId}?occupied=true`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -1110,14 +1110,14 @@ export default function App() {
     setActiveInstructorSchedule(null);
     setActiveInstructorSessionId('');
     sessionStorage.removeItem(INSTRUCTOR_ATTENDANCE_STORAGE_KEY);
-    localStorage.removeItem('clams.instructorToken');
+    sessionStorage.removeItem('clams.instructorToken');
     setInstructorToken('');
     setCurrentScreen('login-portal');
   };
 
   const handleStudentLogout = async () => {
-    localStorage.removeItem('clams.studentToken');
-    localStorage.removeItem('clams.studentSchoolId');
+    sessionStorage.removeItem('clams.studentToken');
+    sessionStorage.removeItem('clams.studentSchoolId');
     setStudentToken('');
     resetStudentLabState();
     setCurrentScreen('login-portal');

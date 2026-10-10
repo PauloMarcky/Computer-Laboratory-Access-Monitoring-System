@@ -10,7 +10,7 @@ async function listWorkload(req, res) {
         include: { subject: true },
         orderBy: { subject: { code: 'asc' } },
       },
-      schedules: { where: { isActive: true }, select: { id: true } },
+      schedules: { where: { isActive: true }, select: { scheduleId: true } },
     },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   });
