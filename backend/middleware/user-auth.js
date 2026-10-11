@@ -18,6 +18,7 @@ async function authenticate(req, res, next) {
   let payload;
   try {
     payload = jwt.verify(match[1], secret, {
+      algorithms: ['HS256'],
       issuer: 'clams-api',
       audience: 'clams-client',
     });

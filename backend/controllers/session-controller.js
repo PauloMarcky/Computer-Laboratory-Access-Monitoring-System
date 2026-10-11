@@ -17,7 +17,7 @@ async function startSession(req, res) {
   if (!scheduleId) return res.status(400).json({ error: 'scheduleId is required.' });
 
   const schedule = await prisma.schedule.findUnique({ where: { scheduleId } });
-  if (!schedule) return res.status(404).json({ error: 'Schedule not found.' });
+  if (!schedule || !schedule.isActive) return res.status(404).json({ error: 'Schedule not found.' });
 
   if (req.user.role === 'INSTRUCTOR') {
     const profile = await getInstructorProfile(req.user.id);

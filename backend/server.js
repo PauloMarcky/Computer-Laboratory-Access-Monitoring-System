@@ -8,8 +8,18 @@ async function startServer() {
     throw new Error('JWT_SECRET must be configured with at least 32 characters in production.');
   }
   await prisma.$connect();
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
+    const shutdown = (signal) => {
+      console.log(`${signal} received, shutting down.`);
+      server.close(async () => {
+        await prisma.$disconnect();
+        process.exit(0);
+      });
+      setTimeout(() => process.exit(1), 10000).unref();
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   });
 }
 

@@ -9,6 +9,7 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "start": "node server.js",
+    "bootstrap:admin": "node scripts/create-admin.js",
     "dev": "nodemon server.js",
     "postinstall": "prisma skills sync || exit 0"
   },
@@ -16,6 +17,7 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": { "node": ">=20" },
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^3.0.3",

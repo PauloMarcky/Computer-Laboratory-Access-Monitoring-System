@@ -229,11 +229,15 @@ async function updateSchedule(req, res) {
 async function deleteSchedule(req, res) {
   const id = toId(req.params.id);
   if (!id) return res.status(400).json({ error: 'Invalid id.' });
+  const sessionCount = await prisma.activeSession.count({ where: { scheduleId: id } });
+  if (sessionCount > 0) return res.status(409).json({ error: 'This schedule has recorded sessions and cannot be deleted.' });
   await prisma.schedule.delete({ where: { scheduleId: id } });
   return res.status(204).send();
 }
 
 async function deleteAllSchedules(req, res) {
+  const sessionCount = await prisma.activeSession.count();
+  if (sessionCount > 0) return res.status(409).json({ error: 'Schedules cannot be bulk deleted while session records exist.' });
   const result = await prisma.schedule.deleteMany({});
   return res.json({ deletedCount: result.count });
 }

@@ -5,6 +5,8 @@ const { toId } = require('../utils/helpers');
 const { normalizeStudentYearLevel, validateStudentImportRows } = require('../utils/student-import');
 
 const creatableRoles = new Set(['STUDENT', 'INSTRUCTOR', 'CUSTODIAN']);
+// Compared against when a school ID does not exist, so response time does not reveal valid IDs.
+const DUMMY_HASH = bcrypt.hashSync('invalid-password-placeholder', 12);
 
 function toPublicUser(user) {
   const profile = user.role === 'STUDENT'
@@ -33,7 +35,9 @@ async function login(req, res) {
     return res.status(400).json({ error: 'schoolId and password are required.' });
   }
 
+  if (password.length > 128) return res.status(401).json({ error: 'Invalid credentials.' });
   const user = await prisma.user.findUnique({ where: { schoolId: schoolId.trim() } });
+  if (!user) await bcrypt.compare(password, DUMMY_HASH);
   if (!user) {
     return res.status(401).json({ error: 'Invalid credentials.' });
   }
@@ -41,7 +45,7 @@ async function login(req, res) {
   const hasBcryptHash = /^\$2[aby]\$\d{2}\$/.test(user.password);
   const isPasswordValid = hasBcryptHash
     ? await bcrypt.compare(password, user.password)
-    : password === user.password;
+    : process.env.NODE_ENV !== 'production' && password === user.password;
   if (!isPasswordValid) {
     return res.status(401).json({ error: 'Invalid credentials.' });
   }
@@ -62,6 +66,7 @@ async function login(req, res) {
     subject: String(user.id),
     issuer: 'clams-api',
     audience: 'clams-client',
+    algorithm: 'HS256',
     expiresIn: '8h',
   });
 
