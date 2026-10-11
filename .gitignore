@@ -1,3 +1,7 @@
 
 # Brud Code workspace history
 .brud/
+
+.env
+.env.*
+!.env.example
